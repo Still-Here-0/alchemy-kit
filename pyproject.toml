@@ -1,0 +1,26 @@
+[project]
+name = "alchemy-kit"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dotenv>=0.9.9",
+    "pandas>=3.0.3",
+    "pandera>=0.31.1",
+    "pydantic>=2.13.4",
+    "pyodbc>=5.3.0",
+    "sqlalchemy>=2.0.50",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatchling.build.targets.wheel]
+packages = ["alchemy-kit"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.0",
+]
