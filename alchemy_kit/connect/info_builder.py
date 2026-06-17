@@ -1,18 +1,19 @@
-from typing import overload, cast, Optional, Dict
+import json
+from pathlib import Path
+from typing import Dict, Literal, Optional, List, cast, overload
+
+import sqlalchemy
 from dotenv import dotenv_values
 from pydantic import SecretStr
-from pathlib import Path
-import sqlalchemy
-import json
 
-from .._core.types import driver_types, auth_types, GenericPath, DialectTypes
+from .._core.types import DialectTypes, GenericPath, api_types
 from .._core.types.api_types import SqlServerApi
-from .._core.types.utils import check_literal
+from ..resources.types import AuthType, _driver_types
 from ._conn_builders import mssql
 from ._info import ConnectionInfo
 
 
-def from_json(json_path: GenericPath) -> Dict[str, ConnectionInfo]:
+def from_json(json_path: GenericPath) -> List[ConnectionInfo]:
     json_path = Path(json_path).resolve()
     connections = {}
     
@@ -20,75 +21,62 @@ def from_json(json_path: GenericPath) -> Dict[str, ConnectionInfo]:
         data: Dict[str, Dict[str, str]] = json.load(file)
 
         for unique_id, conn_data in data.items():
-            dialect: str = conn_data["dialect"]
-            if not check_literal(dialect, DialectTypes):
-                raise ValueError(f"'{dialect}' is not a supported dialect, URLs that use those types of drivers should be built by the user with 'info_builder.from_url'")
-
-            connections[unique_id] = _match_dialect(cast(DialectTypes, dialect), conn_data)
-
-    return connections
+            dialect = DialectTypes(conn_data["dialect"])
+            connections[unique_id] = _match_dialect(cast(DialectTypes, dialect), unique_id, conn_data)
+            
+    return list(connections.values())
 
 def from_env(env_path: GenericPath) -> ConnectionInfo: 
     env_path = Path(env_path).resolve()
     env_data = cast(Dict[str, str], dotenv_values(env_path))
-    dialect = env_data["dialect"]
+    dialect = DialectTypes(env_data["dialect"])
 
-    if check_literal(dialect, DialectTypes):
-        return _match_dialect(cast(DialectTypes, dialect), env_data)
+    return _match_dialect(cast(DialectTypes, dialect), env_data.get("unique_id"), env_data)
+
+def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: Dict[str, str]) -> ConnectionInfo: # CONTINUE
+    auth = AuthType(conn_data["auth"])
     
-    raise ValueError(f"'{dialect}' is not a supported dialect")
-
-def _match_dialect(dialect: DialectTypes, conn_data: Dict[str, str]) -> ConnectionInfo:
-    auth = conn_data["auth"]
-    if not check_literal(auth, auth_types.AuthType):
-        raise ValueError(f"No authentication type called: {auth_types}")
-    auth = cast(auth_types.AuthType, auth)
     match dialect:
-        case "mssql":
-            driver = conn_data["driver"]
-            api = conn_data["api"]
-            if not check_literal(driver, driver_types.SqlServerDrivers):
-                raise ValueError(f"'{driver}' not a supported driver")
+        case DialectTypes.MSSQL:
+            driver = _driver_types.parse_sql_server_driver(conn_data["driver"])
+            api = api_types.SqlServerApi(conn_data.get("api", api_types.SqlServerApi.PYODBC))
 
-            if not check_literal(api, SqlServerApi):
-                raise ValueError(f"'{api}' not a supported api")
-            
-            if check_literal(auth, auth_types.SqlAuth):
+            if auth == AuthType.SQL_AUTH:
                 return from_values_mssql(
-                    cast(auth_types.SqlAuth, auth),
-                    cast(driver_types.SqlServerDrivers, driver),
+                    auth,
+                    driver,
                     conn_data["server"],
                     conn_data["database"],
                     user_name=conn_data["user_name"],
                     user_pwd=SecretStr(conn_data["user_pwd"]),
-                    unique_id=conn_data["a"],
+                    unique_id=unique_id,
                     api=cast(SqlServerApi, api)
                 )
-            elif check_literal(auth, auth_types.MicrosoftAuth):
+            elif auth == AuthType.MICROSOFT_AUTH:
                 return from_values_mssql(
-                    cast(auth_types.MicrosoftAuth, auth),
-                    cast(driver_types.SqlServerDrivers, driver),
+                    auth,
+                    driver,
                     conn_data["server"],
                     conn_data["database"],
-                    unique_id=conn_data["a"],
-                    api=cast(SqlServerApi, api)
+                    unique_id=unique_id,
+                    api=api
                 )
             else:
                 raise ValueError("'auth' is not a supported authentication method")
 
-        case "mysql":
+        case DialectTypes.MYSQL:
             return from_values_mysql()
 
-        case "postgesql":
+        case DialectTypes.POSTGESQL:
             return from_values_postgresql()
 
-        case "mariadb":
+        case DialectTypes.MARIADB:
             return from_values_mariadb()
 
-        case "sqlite":
+        case DialectTypes.SQLITE:
             return from_values_sqlite()
 
-        case "oracle":
+        case DialectTypes.ORACLE:
             return from_values_oracle()
 
 def from_url(url: sqlalchemy.URL, unique_id: Optional[str] = None) -> ConnectionInfo:
@@ -96,50 +84,47 @@ def from_url(url: sqlalchemy.URL, unique_id: Optional[str] = None) -> Connection
 
 @overload
 def from_values_mssql(
-    auth_type: auth_types.MicrosoftAuth,
-    driver: driver_types.SqlServerDrivers,
+    auth_type: Literal[AuthType.MICROSOFT_AUTH],
+    driver: _driver_types.SqlServerDrivers,
     server: str,
     database: str,
     *,
     unique_id: Optional[str] = None,
-    api: SqlServerApi = "pyodbc",
+    api: SqlServerApi = SqlServerApi.PYODBC,
 ) -> ConnectionInfo: ...
 @overload
 def from_values_mssql(
-    auth_type: auth_types.SqlAuth,
-    driver: driver_types.SqlServerDrivers,
+    auth_type: Literal[AuthType.SQL_AUTH],
+    driver: _driver_types.SqlServerDrivers,
     server: str,
     database: str,
     *,
     user_name: str,
     user_pwd: SecretStr,
     unique_id: Optional[str] = None,
-    api: SqlServerApi = "pyodbc",
+    api: SqlServerApi = SqlServerApi.PYODBC,
 ) -> ConnectionInfo: ...
 
 def from_values_mssql(
-    auth_type: auth_types.AuthType,
-    driver: driver_types.SqlServerDrivers,
+    auth_type: AuthType,
+    driver: _driver_types.SqlServerDrivers,
     server: str,
     database: str,
     *,
     user_name: Optional[str] = None,
     user_pwd: Optional[SecretStr] = None,
     unique_id: Optional[str] = None,
-    api: SqlServerApi = "pyodbc",
+    api: SqlServerApi = SqlServerApi.PYODBC,
 ) -> ConnectionInfo:
     conn_url: sqlalchemy.URL
     match auth_type:
-        case auth_types.SqlAuth:
+        case AuthType.SQL_AUTH:
             if user_name is None or user_pwd is None:
-                raise ValueError("SQL Authentication needs user_name and user_pwd to be passed")
+                raise ValueError("SQL Authentication needs user_name and 'user_pwd' to be 'passed'")
             conn_url = mssql.sql_auth(driver, server, database, user_name, user_pwd, api)
 
-        case auth_types.MicrosoftAuth:
+        case AuthType.MICROSOFT_AUTH:
             conn_url = mssql.microsoft_auth(driver, server, database, api)
-
-        case _:
-            raise ValueError(f"No authentication type called: {auth_types}")
 
     return ConnectionInfo(conn_url, unique_id)
 

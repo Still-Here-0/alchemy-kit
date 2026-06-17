@@ -1,0 +1,9 @@
+{
+  "test": {
+    "dialect": "mssql",
+    "auth":"Microsoft-Auth",
+    "driver":"SQL Server",
+    "server":"test",
+    "database":"test"
+  }
+}

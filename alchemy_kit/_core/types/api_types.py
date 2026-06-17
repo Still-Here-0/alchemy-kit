@@ -1,39 +1,38 @@
-from typing import Literal, TypeAlias, Union
+from enum import StrEnum
 
 
-SqlServerApi: TypeAlias = Literal[
-    "pyodbc",
-    # "pymssql",
-    # "aioodbc",
-]
+class SqlServerApi(StrEnum):
+    PYODBC = "pyodbc"
+    PYMSSQL = "pymssql"
+    AIOODBC = "aioodbc"
 
-PostgreApi: TypeAlias = Literal[
-    "psycopg",
-    #"psycopg2",
-    #"asyncpg",
-    "pg8000",
-    "psycopg2cffi",
-]
 
-MySqlApi: TypeAlias = Literal[
-    "mysqldb",
-    "pymysql",
-    "mysqlconnector",
-    # "asyncmy",
-    # "aiomysql",
-]
+class PostgreApi(StrEnum):
+    PSYCOPG = "psycopg"
+    # PSYCOPG2 = "psycopg2"
+    # ASYNCPG = "asyncpg"
+    PG8000 = "pg8000"
+    PSYCOPG2CFFI = "psycopg2cffi"
 
-MariaDbApi: TypeAlias = Literal[
-    "mariadbconnector",
-    "pymysql",
-    "mysqlconnector",
-    # "asyncmy",
-    # "aiomysql",
-]
 
-OracleApi: TypeAlias = Literal[
-    "oracledb",
-    "cx_oracle",
-]
+class MySqlApi(StrEnum):
+    MYSQLDB = "mysqldb"
+    PYMYSQL = "pymysql"
+    MYSQLCONNECTOR = "mysqlconnector"
+    # ASYNCMY = "asyncmy"
+    # AIOMYSQL = "aiomysql"
 
-ApiTypes: TypeAlias = SqlServerApi # Union[SqlServerApi, PostgreApi, MySqlApi, MariaDbApi, OracleApi]
+
+class MariaDbApi(StrEnum):
+    MARIADBCONNECTOR = "mariadbconnector"
+    PYMYSQL = "pymysql"
+    MYSQLCONNECTOR = "mysqlconnector"
+    # ASYNCMY = "asyncmy"
+    # AIOMYSQL = "aiomysql"
+
+
+class OracleApi(StrEnum):
+    ORACLEDB = "oracledb"
+    CX_ORACLE = "cx_oracle"
+
+
