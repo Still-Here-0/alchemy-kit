@@ -3,26 +3,27 @@ from pathlib import Path
 import sqlalchemy
 from pydantic import SecretStr
 
+from alchemy_kit.connect import EngineManager
 from alchemy_kit.connect.info_builder import (
     from_env,
     from_json,
     from_url,
     from_values_mssql,
 )
-from alchemy_kit.resources.types import AuthType, SqlServerODBC, SqlServerNative
+from alchemy_kit.types import AuthType, SqlServerNative, SqlServerODBC
 
+DIR = Path(__file__).resolve().parent.parent
 
 def test_init_info():
-    DIR = Path(__file__).resolve().parent.parent
     a = from_json(DIR / "test_json.json")
-    print(f"{a=}")
+    assert all([isinstance(con.unique_id, str) for con in a])
 
     b = from_env(DIR / "dotenv_test")
-    print("b=" + b.unique_id)
+    assert isinstance(b.unique_id, str)
 
     url = sqlalchemy.URL.create("teste_driver")
     c = from_url(url)
-    print("c=" + c.unique_id)
+    assert isinstance(c.unique_id, str)
 
     d = from_values_mssql(
         AuthType.SQL_AUTH,
@@ -31,10 +32,21 @@ def test_init_info():
         "teste",
         user_name="teste",
         user_pwd=SecretStr("teste"),
+        unique_id="a"
     )
-    print("d=" + d.unique_id)
+    assert d.unique_id == "a"
 
     e = from_values_mssql(
         AuthType.MICROSOFT_AUTH, SqlServerNative.CLIENT_11, "teste", "teste"
     )
-    print("e=" + e.unique_id)
+    assert isinstance(e.unique_id, str)
+
+def test_manager():
+    url = sqlalchemy.URL.create("sqlite")
+    info = from_url(url, "a")
+
+    with EngineManager(None) as manager:
+        handler = manager.create_engine(info)
+        assert handler._con_info.unique_id == "a"
+
+

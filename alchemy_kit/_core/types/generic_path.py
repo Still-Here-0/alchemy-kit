@@ -1,4 +1,4 @@
-from typing import Union, TypeAlias
+from typing import TypeAlias
 from pathlib import Path
 
-GenericPath: TypeAlias = Union[str, Path]
+GenericPath: TypeAlias = str | Path

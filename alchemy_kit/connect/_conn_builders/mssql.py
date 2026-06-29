@@ -1,7 +1,7 @@
 from pydantic import SecretStr
 import sqlalchemy
 
-from ...resources.types import _driver_types
+from ...types import _driver_types
 from ..._core.types.api_types import SqlServerApi
 
 

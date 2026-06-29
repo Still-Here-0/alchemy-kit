@@ -5,9 +5,9 @@ from typing import TypeAlias, Literal
 class DialectTypes(StrEnum):
     MSSQL = "mssql"
     MYSQL = "mysql"
-    POSTGESQL = "postgesql"
+    POSTGRESQL = "postgresql"
     MARIADB = "mariadb"
     SQLITE = "sqlite"
     ORACLE = "oracle"
 
-DialectTypesInput: TypeAlias = Literal["mssql", "mysql", "postgesql", "mariadb", "sqlite", "oracle"]
+DialectTypesInput: TypeAlias = Literal["mssql", "mysql", "postgresql", "mariadb", "sqlite", "oracle"]

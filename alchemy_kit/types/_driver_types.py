@@ -1,4 +1,4 @@
-from typing import TypeAlias, Union, get_args
+from typing import TypeAlias, get_args
 from enum import StrEnum
 
 class SqlServerODBC(StrEnum):
@@ -11,7 +11,7 @@ class SqlServerNative(StrEnum):
     CLIENT_11 = "SQL Server Native Client 11.0"
     CLIENT_10 = "SQL Server Native Client 10.0"
 
-SqlServerDrivers: TypeAlias = Union[SqlServerODBC, SqlServerNative]
+SqlServerDrivers: TypeAlias = SqlServerODBC | SqlServerNative
 
 _AUTH_MAP: dict[str, SqlServerDrivers] = {
     member.value: member
