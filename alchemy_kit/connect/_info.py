@@ -1,12 +1,12 @@
-from pathlib import Path
-from typing import Optional
-import sqlalchemy
 import random
 import string
-import inspect
+from pathlib import Path
+from typing import Optional
 
-from .._core.types import DialectTypes
-from ..resources._settings import Settings
+import sqlalchemy
+
+from .._core.types.dialect_types import DialectTypes
+from ..resources.dir_helpers import find_project_root
 
 
 class ConnectionInfo:
@@ -80,29 +80,7 @@ class ConnectionInfo:
             ValueError: If the caller, the project root, or ``folder_name``
                 cannot be found.
         """
-        package_root = Path(__file__).resolve().parent.parent
-
-        caller_file: Path | None = None
-        for frame in inspect.stack():
-            # Skip synthetic frames (<string>, <frozen ...>) that aren't real files.
-            if frame.filename.startswith("<"):
-                continue
-            frame_file = Path(frame.filename).resolve()
-            if package_root not in frame_file.parents:
-                caller_file = frame_file
-                break
-
-        if caller_file is None:
-            raise ValueError("Could not determine the calling script outside alchemy_kit")
-
-        project_root: Path | None = None
-        for directory in (caller_file.parent, *caller_file.parents):
-            if any((directory / marker).exists() for marker in Settings.project_markers):
-                project_root = directory
-                break
-
-        if project_root is None:
-            raise ValueError(f"Could not find a project root above {caller_file}")
+        project_root = find_project_root()
 
         # Locate `folder_name` within the caller's project.
         candidate = project_root / folder_name

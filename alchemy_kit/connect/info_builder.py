@@ -6,12 +6,14 @@ import sqlalchemy
 from dotenv import dotenv_values
 from pydantic import SecretStr
 
-from .._core.types import DialectTypes, GenericPath
+from .._core.types.dialect_types import DialectTypes
+from .._core.types.generic_path import GenericPath
 from ..types.api_types import SqlServerApi
-from ..types import AuthType, _driver_types
+from ..types.auth_types import AuthType
+from ..types import _driver_types
 from ._conn_builders import mssql
 from ._info import ConnectionInfo
-from ..resources import Settings
+from ..resources._settings import Settings
 
 def from_json(json_path: GenericPath) -> list[ConnectionInfo]:
     """Build a list of connections from a JSON file.

@@ -6,7 +6,7 @@ from typing import Optional, Self
 import sqlalchemy
 
 from .._core.engine_pool import EnginePool, EngineInfo
-from ..resources import BetterLogger
+from ..resources._better_logger import BetterLogger
 from ._engine_handler import EngineHandler
 from ._info import ConnectionInfo
 

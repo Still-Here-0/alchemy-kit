@@ -2,7 +2,7 @@ from pydantic import SecretStr
 import sqlalchemy
 
 from ...types import _driver_types
-from ..._core.types.api_types import SqlServerApi
+from ...types.api_types import SqlServerApi
 
 
 def sql_auth(
