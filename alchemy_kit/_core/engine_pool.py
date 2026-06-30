@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 class EngineInfo(NamedTuple):
     engine: sqlalchemy.Engine
-    con_info: ConnectionInfo
-    handlers: list[EngineHandler]
+    con_info: "ConnectionInfo"
+    handlers: list["EngineHandler"]
 
 EnginePool: TypeAlias = dict[str, EngineInfo]

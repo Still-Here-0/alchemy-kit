@@ -6,7 +6,5 @@ class DBModel:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.schemas: set[SchemaModel] = set()
+        self.schemas: dict[str, SchemaModel] = {}
 
-    def add_schema(self, schema: SchemaModel):
-        self.schemas.add(schema)

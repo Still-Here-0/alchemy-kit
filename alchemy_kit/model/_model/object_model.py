@@ -6,11 +6,14 @@ class ObjectModel:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.columns: set[ColumnModel] = set()
-        self.unique_constrait: set[set[ColumnModel]] = set()
+        self.columns: dict[str, ColumnModel] = {}
+        self._unique_constrait: set[set[str]] = set()
 
-    def add_column(self, column: ColumnModel):
-        self.columns.add(column)
+    def add_unique_constrait(self, col_names: list[str]):
+        keys = list(self.columns.keys())
+        for col_name in col_names:
+            if col_name not in keys:
+                raise ValueError(f"Table '{self.name}' does not have a column called '{col_name}'")
 
-    def add_unique_constrait(self, column_names: list[str]):
-        ...
+        self._unique_constrait.add(set(col_names))
+
