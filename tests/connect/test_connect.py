@@ -3,14 +3,15 @@ from pathlib import Path
 import sqlalchemy
 from pydantic import SecretStr
 
-from alchemy_kit.connect import EngineManager
+from alchemy_kit.connect._engine_manager import EngineManager
 from alchemy_kit.connect.info_builder import (
     from_env,
     from_json,
     from_url,
     from_values_mssql,
 )
-from alchemy_kit.types import AuthType, SqlServerNative, SqlServerODBC
+from alchemy_kit.types.auth_types import AuthType
+from alchemy_kit.types._driver_types import SqlServerNative, SqlServerODBC
 
 DIR = Path(__file__).resolve().parent.parent
 
