@@ -71,3 +71,4 @@ class SchemaConfig:
 
         else:
             self._exclude[schema_name].update(objects)
+

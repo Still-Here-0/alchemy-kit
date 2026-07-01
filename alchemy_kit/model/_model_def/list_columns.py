@@ -1,10 +1,12 @@
 from typing import Self
-from pandera.pandas import Field
-from pandera.typing import Series, DataFrame
 
+from pandera.pandas import Field
+from pandera.typing import DataFrame, Series
+
+from ...connect._engine_handler import EngineHandler
+from ...types._sql_parameters import SqlParamters
 from ..base_model import BaseModel
-from . import get_data
-from ...connect._info import ConnectionInfo
+from .utils import get_sql
 
 
 class ListColumns(BaseModel):
@@ -34,6 +36,8 @@ class ListColumns(BaseModel):
 
 
     @classmethod
-    def get_data(cls, info: ConnectionInfo) -> DataFrame[Self]:
-        return cls.validate(get_data(info, "list_columns"))
-
+    def get_data(cls, handler: EngineHandler, schema_name: str, object_name: str) -> DataFrame[Self]:
+        sql_params: SqlParamters = {"schema": schema_name, "object": object_name}
+        sql = get_sql(handler, "list_columns", sql_params, {})
+        _, df = handler.run_sql(sql)
+        return cls.validate(df)

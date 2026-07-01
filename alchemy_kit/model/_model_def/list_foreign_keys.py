@@ -9,25 +9,25 @@ from ..base_model import BaseModel
 from .utils import get_sql
 
 
-class ListUniqueClusters(BaseModel):
-    """Schema for the `list_columns_clusters` query result.
+class ListForeignKeys(BaseModel):
+    """Schema for the `list_foreign_keys` query result (one row per FK constraint).
 
-    One row per multi-column key/index (PK or unique) on a table/view.
+    ``columns`` and ``ref_columns`` are comma-separated, key-ordinal ordered and
+    parallel: the i-th local column references the i-th referenced column.
     Column order and names mirror the SELECT list of the dialect SQL files.
     """
 
-    key_name: Series[str] = Field(nullable=False)
-    is_primary_key: Series[bool] = Field(nullable=False)
-    is_unique_constraint: Series[bool] = Field(nullable=False)
-    is_unique: Series[bool] = Field(nullable=False)
-    index_type: Series[str] = Field(nullable=False)
-    column_count: Series[int] = Field(nullable=False)
+    fk_name: Series[str] = Field(nullable=False)
+    ref_schema: Series[str] = Field(nullable=False)
+    ref_table: Series[str] = Field(nullable=False)
     columns: Series[str] = Field(nullable=False)
-
+    ref_columns: Series[str] = Field(nullable=False)
+    on_delete: Series[str] = Field(nullable=False)
+    on_update: Series[str] = Field(nullable=False)
 
     @classmethod
     def get_data(cls, handler: EngineHandler, schema_name: str, object_name: str) -> DataFrame[Self]:
         sql_params: SqlParamters = {"schema": schema_name, "object": object_name}
-        sql = get_sql(handler, "list_unique_clusters", sql_params, {})
+        sql = get_sql(handler, "list_foreign_keys", sql_params, {})
         _, df = handler.run_sql(sql)
         return cls.validate(df)

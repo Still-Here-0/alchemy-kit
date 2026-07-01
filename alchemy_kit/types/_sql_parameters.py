@@ -1,6 +1,6 @@
-from typing import Mapping, Sequence, TypeAlias
+from typing import Sequence, TypeAlias
 from .sql_types import SqlParamType
 
-SqlParamMap: TypeAlias = Mapping[str, SqlParamType]
+SqlParamMap: TypeAlias = dict[str, SqlParamType]
 SqlParamters: TypeAlias = SqlParamMap | Sequence[SqlParamMap]
-SqlTextReplacement: TypeAlias = Mapping[str, str]
+SqlTextReplacement: TypeAlias = dict[str, str]

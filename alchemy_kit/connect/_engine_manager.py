@@ -1,15 +1,20 @@
 from contextlib import AbstractContextManager
 from logging import Logger
 from types import TracebackType
-from typing import Optional, Self
+from typing import Optional, Self, NamedTuple, TypeAlias
 
 import sqlalchemy
 
-from .._core.engine_pool import EnginePool, EngineInfo
 from ..resources._better_logger import BetterLogger
 from ._engine_handler import EngineHandler
 from ._info import ConnectionInfo
 
+class _EngineInfo(NamedTuple):
+    engine: sqlalchemy.Engine
+    con_info: ConnectionInfo
+    handlers: list[EngineHandler]
+
+_EnginePool: TypeAlias = dict[str, _EngineInfo]
 
 class EngineManager(AbstractContextManager):
     """Context manager that owns a pool of SQLAlchemy engines.
@@ -38,7 +43,7 @@ class EngineManager(AbstractContextManager):
     """
 
     def __init__(self, logger: Optional[BetterLogger | Logger]) -> None:
-        self._engine_pool: EnginePool
+        self._engine_pool: _EnginePool
         self.logger: BetterLogger
 
         if isinstance(logger, BetterLogger):
@@ -85,7 +90,7 @@ class EngineManager(AbstractContextManager):
             raise ValueError(f"Engine with unique id '{con_info.unique_id}' aready exists")
 
         engine = sqlalchemy.create_engine(con_info.con_url)
-        self._engine_pool[con_info.unique_id] = EngineInfo(engine, con_info, [])
+        self._engine_pool[con_info.unique_id] = _EngineInfo(engine, con_info, [])
 
         return self.get_handler(con_info.unique_id)
 

@@ -22,5 +22,21 @@ packages = ["alchemy-kit"]
 
 [dependency-groups]
 dev = [
+    "import-linter>=2.12",
+    "pandas-stubs>=3.0.3.260530",
+    "pydeps>=3.0.6",
     "pytest>=9.1.0",
+]
+
+[tool.importlinter]
+root_package = "alchemy_kit"
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture"
+type = "layers"
+layers = [
+    "alchemy_kit.model",
+    "alchemy_kit.connect",
+    "alchemy_kit.resources",
+    "alchemy_kit._core | alchemy_kit.types",
 ]
