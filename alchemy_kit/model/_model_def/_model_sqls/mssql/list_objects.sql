@@ -4,7 +4,7 @@ SELECT
 FROM sys.tables t
 JOIN sys.schemas s
   ON s.schema_id = t.schema_id
-WHERE s.name = :schame
+WHERE s.name = :schema
 !t_include_objects!
 !t_exclude_objects!
 
@@ -16,7 +16,7 @@ SELECT
 FROM sys.views v
 JOIN sys.schemas s
   ON s.schema_id = v.schema_id
-WHERE s.name = :schame
+WHERE s.name = :schema
 !v_include_objects!
 !v_exclude_objects!
 
