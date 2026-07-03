@@ -1,7 +1,8 @@
-from ._builder import builder
+from ._builder import build, build_svg
 from ._schema_config import SchemaConfig
 
 __all__ = [
-    "builder",
+    "build",
+    "build_svg",
     "SchemaConfig",
 ]

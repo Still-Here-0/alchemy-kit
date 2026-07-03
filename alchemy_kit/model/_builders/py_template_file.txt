@@ -1,0 +1,28 @@
+# --------------------------------------------------------------------------------
+# AUTO-GENERATED FILE - DO NOT EDIT
+#
+# This file was generated automatically by alchemy_kit.
+# Any manual changes will be overwritten the next time it is regenerated.
+#
+# To update this file, modify the source database and re-run the builder script.
+#
+# --------------------------------------------------------------------------------
+
+from alchemy_kit.model.base_model import BaseModel
+from datetime import datetime, date
+from pandera.typing import Series
+from typing import Optional, Any
+import pandera.pandas as pa
+
+class {class_name}(BaseModel):
+    :columns
+
+    class Config(BaseModel.Config):
+        {unique}
+        metadata = MetaData(
+            schema_name="",
+            obj_name="",
+            obj_type="",
+            reference_name="",
+            description="",
+        )

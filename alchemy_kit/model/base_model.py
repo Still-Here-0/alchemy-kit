@@ -9,12 +9,13 @@ import pandas as pd
 from ..types.errors._model_validation_error import ModelValidationError
 
 
-class _MetaData(TypedDict):
+class MetaData(TypedDict):
     schema_name: str
     obj_name: str
     obj_type: str
     reference_name: str
-    description: str
+    description: str | None
+
 
 class _BaseModelMeta(MetaModel):
     def __init__(self, name, bases, namespace) -> None:
@@ -91,7 +92,7 @@ class BaseModel(DataFrameModel, metaclass=_BaseModelMeta):
     
     @classmethod
     def to_model(cls):
-        ...
+        ... # TODO: Make this after builder is implemented
 
     class Config(DataFrameModel.Config):
         coerce = True
@@ -100,5 +101,5 @@ class BaseModel(DataFrameModel, metaclass=_BaseModelMeta):
 
         # Changes based on sql object
         unique: list[str] | list[list[str]] | None = None  # pyright: ignore[reportIncompatibleVariableOverride]
-        metadata: _MetaData  # pyright: ignore[reportIncompatibleVariableOverride]
+        metadata: MetaData  # pyright: ignore[reportIncompatibleVariableOverride]
 
