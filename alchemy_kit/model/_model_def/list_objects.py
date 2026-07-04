@@ -30,13 +30,13 @@ class ListObjects(BaseModel):
         }
 
         include_data = schema_conf._include.get(schema_name)
-        if include_data is not None:
+        if include_data:
             txt_replac["t_include_objects"] = "AND t.name in :include_objects"
             txt_replac["v_include_objects"] = "AND v.name in :include_objects"
             sql_params["include_objects"] = include_data
 
         exclude_data = schema_conf._exclude.get(schema_name)
-        if exclude_data is not None:
+        if exclude_data:
             txt_replac["t_exclude_objects"] = "AND t.name not in :exclude_objects"
             txt_replac["v_exclude_objects"] = "AND v.name not in :exclude_objects"
             sql_params["exclude_objects"] = exclude_data

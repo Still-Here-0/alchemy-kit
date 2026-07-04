@@ -20,3 +20,9 @@ class ObjectModel:
 
         self._unique_constrait.add(frozenset(col_names))
 
+    def get_unique_constrait(self) -> list[list[str]] | None:
+        if not self._unique_constrait:
+            return None
+        
+        return [list(uq) for uq in self._unique_constrait]
+

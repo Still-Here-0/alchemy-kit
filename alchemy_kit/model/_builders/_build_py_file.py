@@ -7,13 +7,12 @@ from ..._core.resources.identifiers import static
 from ..._core.types import DialectTypes
 from .._model.column_model import ColumnModel
 from .._model.object_model import ObjectModel
-from ..base_model import BaseModel
 
 
 @dataclass(kw_only=True)
 class PyFileBuilder:
     template: ClassVar[Path] = Path(__file__).resolve().parent/"py_template_file.txt"
-    column_template: ClassVar[str] = "{column_name}: {column_type} = pa.Field({column_parameters})"
+    column_template: ClassVar[str] = "    {column_name}: {column_type} = pa.Field({column_parameters})"
     identifiers: set[str] = field(default_factory=lambda: set(static), init=False, repr=False)
 
     class_name: str
@@ -33,8 +32,16 @@ class PyFileBuilder:
                 column_parameters=self._get_column_parameters(column_data),
             )
             lines.insert(column_idx, column)
+            column_idx += 1
+
+        lines.pop(column_idx)
 
         file_data = "\n".join(lines)
+        file_data = file_data.format(
+            class_name=self.class_name,
+            unique=self.object_model.get_unique_constrait(),
+        )
+
         self.file_path.write_text(file_data, "UTF-8")
         return file_data
 

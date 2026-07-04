@@ -17,7 +17,13 @@ def build_model(model: DBModel, result_dir: Path, root_dir: Path, logger: Better
             object_path = schema_path / object_name
             
             object_py   = object_path.with_suffix(".py")
-            PyFileBuilder(class_name="", file_path=object_py, object_model=object_data, db_dialect=model.dialect)
+            file_data = PyFileBuilder(
+                class_name=object_name, # TODO: this name should be validated
+                file_path=object_py, 
+                object_model=object_data, 
+                db_dialect=model.dialect
+            ).build()
+            # TODO: log file name, object name and file lenght
 
             object_pyi  = object_path.with_suffix(".pyi")
 

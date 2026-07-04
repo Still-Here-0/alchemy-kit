@@ -8,7 +8,7 @@
 #
 # --------------------------------------------------------------------------------
 
-from alchemy_kit.model.base_model import BaseModel
+from alchemy_kit.model.base_model import BaseModel, MetaData
 from datetime import datetime, date
 from pandera.typing import Series
 from typing import Optional, Any
@@ -18,11 +18,11 @@ class {class_name}(BaseModel):
     :columns
 
     class Config(BaseModel.Config):
-        {unique}
+        unique = {unique}
         metadata = MetaData(
             schema_name="",
             obj_name="",
             obj_type="",
             reference_name="",
-            description="",
+            description=None,
         )

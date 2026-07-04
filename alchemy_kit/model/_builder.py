@@ -18,7 +18,7 @@ def build(
         root_dir: Path | None = None,
         logger: Logger | BetterLogger | None = None,
     ):
-    if not result_dir.is_file():
+    if result_dir.is_file():
         raise ValueError(f"{result_dir} is a file, expected a directory (or nonexistent path)")
 
     if schema_config is None:
