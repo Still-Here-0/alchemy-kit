@@ -41,3 +41,12 @@ class DialectParameterMap(ABC):
     def render_type(cls, column: ColumnLike) -> str:
         """Render the fully-parameterised SQL type, e.g. ``nvarchar(200)``."""
         ...
+
+    @classmethod
+    def str_length(cls, column: ColumnLike) -> int | None:
+        """Maximum length (in characters) for a bounded string column.
+
+        Returns ``None`` when the column is not a length-bounded string type
+        (e.g. numeric types, or unbounded strings such as ``varchar(max)``).
+        """
+        ...

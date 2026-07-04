@@ -67,7 +67,7 @@ class EngineManager(AbstractContextManager):
                 handler._engine = None # type: ignore
 
         if log_errors:
-            pass #TODO: log errors to terminal
+            pass # TODO: log errors to terminal
 
         self._engine_pool.clear()
 

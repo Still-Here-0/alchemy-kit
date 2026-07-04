@@ -18,11 +18,5 @@ class {class_name}(BaseModel):
     :columns
 
     class Config(BaseModel.Config):
-        unique = {unique}
-        metadata = MetaData(
-            schema_name="",
-            obj_name="",
-            obj_type="",
-            reference_name="",
-            description=None,
-        )
+        {unique}
+        {metadata}

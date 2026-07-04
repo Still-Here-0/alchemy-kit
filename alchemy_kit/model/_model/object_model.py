@@ -1,12 +1,14 @@
 from .column_model import ColumnModel
 from .constraint_model import CheckConstraintModel, ForeignKeyConstraintModel
-
+from ...types._sql_utilities import ObjectType
 
 
 class ObjectModel:
 
-    def __init__(self, name: str) -> None:
-        self.name = name
+    def __init__(self, obj_name: str, obj_type: ObjectType, description: str | None) -> None:
+        self.name = obj_name
+        self.type = obj_type
+        self.description = description
         self.columns: dict[str, ColumnModel] = {}
         self._unique_constrait: set[frozenset[str]] = set()
         self.foreign_keys: dict[str, ForeignKeyConstraintModel] = {}

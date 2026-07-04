@@ -25,10 +25,17 @@ def render_type(dialect: DialectTypes, column: ColumnLike) -> str:
     return get_map(dialect).render_type(column)
 
 
+def get_str_length(dialect: DialectTypes, column: ColumnLike) -> int | None:
+    """Return the max character length for a bounded string ``column``, else ``None``."""
+    return get_map(dialect).str_length(column)
+
+
 __all__ = [
     "ColumnLike",
     "DialectParameterMap",
     "MssqlTypeParameters",
-    "get_map", "get_type",
+    "get_map",
+    "get_str_length",
+    "get_type",
     "render_type",
 ]

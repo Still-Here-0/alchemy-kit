@@ -1,13 +1,12 @@
 from typing import Sequence, cast
 
-import pandera as pa
 import pandas as pd
 import sqlalchemy
 
 from ..resources._sql import SQL
+from ..types._sql_parameters import SqlParamMap
 from ..types.sql_types import SqlExpandType
 from ._info import ConnectionInfo
-from ..types._sql_parameters import SqlParamMap
 
 
 class EngineHandler:
@@ -85,7 +84,14 @@ class EngineHandler:
         binded_query = query.bindparams(*binds) if binds else query
 
         return conn.execute(binded_query)
-
-    def insert_data[T: pa.DataFrameModel](self, data: pa.typing.DataFrame[T], table: type[T]): # TODO: validate it after builder is implemented
+    
+    def insert_data(
+        self,
+        data: pd.DataFrame,
+        table_name: str,
+        schema_name: str,
+        *,
+        truncate: bool = False,
+    ): # TODO: validate it after builder is implemented
         ...
 

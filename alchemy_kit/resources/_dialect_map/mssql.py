@@ -87,6 +87,18 @@ class MssqlParameterMap(DialectParameterMap):
 
         return t
 
+    @classmethod
+    def str_length(cls, column: ColumnLike) -> int | None:
+        t = column.type.lower()
+
+        if column.max_length is None or column.max_length == -1:
+            return None
+        if t in cls._length_types_nchar:
+            return column.max_length // 2
+        if t in cls._length_types_char:
+            return column.max_length
+        return None
+
 
 # Pyright checks that every key we *write* is a valid MssqlType, but not that
 # all members are present. This guard closes that gap at import time.

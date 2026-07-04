@@ -18,13 +18,14 @@ class ListObjects(BaseModel):
 
     object_name: Series[str] = Field(nullable=False)
     object_type: Series[str] = Field(nullable=False)
+    object_description: Series[str] = Field(nullable=True)
 
     @classmethod
     def get_data(cls, handler: EngineHandler, schema_conf: SchemaConfig, schema_name: str) -> DataFrame[Self]:
         sql_params: SqlParamters = {"schema": schema_name}
         txt_replac: SqlTextReplacement = {
-            "t_include_objects": "", 
-            "v_include_objects": "", 
+            "t_include_objects": "",
+            "v_include_objects": "",
             "t_exclude_objects": "",
             "v_exclude_objects": "",
         }

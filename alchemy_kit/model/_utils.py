@@ -8,6 +8,7 @@ import pandas as pd
 from ..connect._engine_manager import EngineManager
 from ..connect._info import ConnectionInfo
 from ..resources._better_logger import BetterLogger
+from ..types._sql_utilities import ObjectType
 from ._model.column_model import ColumnModel, ForeignKeyModel
 from ._model.constraint_model import CheckConstraintModel, ForeignKeyConstraintModel
 from ._model.db_model import DBModel
@@ -44,7 +45,9 @@ def parse_db(conn_info: ConnectionInfo, schema_conf: SchemaConfig, logger: Bette
             object_data = ListObjects.get_data(handler, schema_conf, schema_name)
             for _, row in object_data.iterrows():
                 object_name: str = row[ListObjects.object_name]
-                sql_object = ObjectModel(object_name)
+                object_type: ObjectType = row[ListObjects.object_type]
+                object_desc: str | None = none_if_na(row[ListObjects.object_description])
+                sql_object = ObjectModel(object_name, object_type, object_desc)
                 sql_schema.objects[object_name] = sql_object
 
                 column_data = ListColumns.get_data(handler, schema_name, object_name)
