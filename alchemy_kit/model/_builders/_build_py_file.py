@@ -24,6 +24,12 @@ class PyFileBuilder:
 
     def build(self) -> str:
         template = self.template.read_text("UTF-8")
+        template = template.format(
+            class_name=self.class_name,
+            unique=f"unique={self.object_model.get_unique_constrait()!r}",
+            metadata=self._get_object_metadata(),
+        )
+
         lines = template.splitlines()
         column_idx = lines.index("    :columns")
 
@@ -38,13 +44,7 @@ class PyFileBuilder:
 
         lines.pop(column_idx)
 
-        file_data = "\n".join(lines)
-        file_data = file_data.format(
-            class_name=self.class_name,
-            unique=f"unique={self.object_model.get_unique_constrait()!r}",
-            metadata=self._get_object_metadata(),
-        )
-
+        file_data = '\n'.join(lines)
         self.file_path.write_text(file_data, "UTF-8")
         return file_data
 
