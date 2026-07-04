@@ -22,7 +22,7 @@ def test_init_info():
     b = from_env(DIR / "dotenv_test")
     assert isinstance(b.unique_id, str)
 
-    url = sqlalchemy.URL.create("teste_driver")
+    url = sqlalchemy.URL.create("mssql")
     c = from_url(url)
     assert isinstance(c.unique_id, str)
 

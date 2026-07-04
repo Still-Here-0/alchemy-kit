@@ -5,7 +5,7 @@ from typing import Callable, Sequence
 
 import sqlalchemy
 
-from .._core.types.generic_path import GenericPath
+from ..types.generic_path import GenericPath
 from ._settings import Settings
 from ..types._sql_parameters import SqlParamters, SqlTextReplacement
 

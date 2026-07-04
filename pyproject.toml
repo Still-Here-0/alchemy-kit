@@ -38,5 +38,5 @@ layers = [
     "alchemy_kit.model",
     "alchemy_kit.connect",
     "alchemy_kit.resources",
-    "alchemy_kit._core | alchemy_kit.types",
+    "alchemy_kit.types",
 ]

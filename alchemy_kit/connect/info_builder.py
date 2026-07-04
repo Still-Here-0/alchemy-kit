@@ -6,8 +6,8 @@ import sqlalchemy
 from dotenv import dotenv_values
 from pydantic import SecretStr
 
-from .._core.types.dialect_types import DialectTypes
-from .._core.types.generic_path import GenericPath
+from ..types.dialect_types import DialectTypes
+from ..types.generic_path import GenericPath
 from ..types.api_types import SqlServerApi
 from ..types.auth_types import AuthType
 from ..types import _driver_types
@@ -28,8 +28,14 @@ def from_json(json_path: GenericPath) -> list[ConnectionInfo]:
 
     Returns:
         One ``ConnectionInfo`` per entry, in file order.
+
+    Raises:
+        ValueError: If ``json_path`` does not point to an existing file.
     """
     json_path = Path(json_path).resolve()
+    if not json_path.is_file():
+        raise ValueError(f"JSON file not found: '{json_path}'")
+
     connections = {}
     
     with json_path.open('r', encoding="UTF-8") as file:
@@ -53,8 +59,14 @@ def from_env(env_path: GenericPath) -> ConnectionInfo:
 
     Returns:
         The ``ConnectionInfo`` for the connection described in the file.
+
+    Raises:
+        ValueError: If ``env_path`` does not point to an existing file.
     """
     env_path = Path(env_path).resolve()
+    if not env_path.is_file():
+        raise ValueError(f".env file not found: '{env_path}'")
+
     env_data = cast(dict[str, str], dotenv_values(env_path))
     dialect = DialectTypes(env_data[Settings.FileExtraction.dialect_marker])
 

@@ -2,9 +2,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
 
-from ..._core.resources.dialect_map import get_type
-from ..._core.resources.identifiers import static
-from ..._core.types import DialectTypes
+from ...resources._dialect_map import get_type
+from ...resources._identifiers import static
+from ...types import DialectTypes
 from .._model.column_model import ColumnModel
 from .._model.object_model import ObjectModel
 
@@ -59,14 +59,17 @@ class PyFileBuilder:
         return column_type
 
     def _get_column_parameters(self, column_model: ColumnModel) -> str: # TODO: Add more info, create a real column metadata
-        parameters: list[str] = [f"nullable={column_model.is_nullable}"]
+        parameters: list[str] = [
+            f"nullable={column_model.is_nullable}",
+            f"alias={column_model.name!r}",
+        ]
 
         if column_model.is_unique or column_model.is_primary_key:
             parameters.append("unique=True")
 
         if column_model.description:
             description = column_model.description.replace('"', '\\"')
-            parameters.append(f'description="{description}"')
+            parameters.append(f"description={description!r}")
 
         return ", ".join(parameters)
 

@@ -1,4 +1,4 @@
-from ..._core.types.dialect_types import DialectTypes
+from ...types.dialect_types import DialectTypes
 from .schema_model import SchemaModel
 
 

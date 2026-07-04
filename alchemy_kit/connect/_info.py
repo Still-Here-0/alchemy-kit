@@ -5,7 +5,7 @@ from typing import Optional
 
 import sqlalchemy
 
-from .._core.types.dialect_types import DialectTypes
+from ..types.dialect_types import DialectTypes
 from ..resources.dir_helpers import find_project_root
 
 
