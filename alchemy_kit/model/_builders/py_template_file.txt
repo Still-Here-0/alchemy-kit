@@ -8,13 +8,19 @@
 #
 # --------------------------------------------------------------------------------
 
-from alchemy_kit.model.base_model import BaseModel, MetaData
+from {base_model_module} import BaseModel, MetaData
+from {dialect_types_module} import DialectTypes
+from {type_parameters_module} import {type_parameters}
+from {parameter_map_module} import {parameter_map}
 from datetime import datetime, date
 from pandera.typing import Series
 from typing import Optional, Any
 import pandera.pandas as pa
 
-class {class_name}(BaseModel):
+class {class_name}(BaseModel[{type_parameters}]):
+    _dialect = {dialect}
+    _map = {parameter_map}
+
     :columns
 
     class Config(BaseModel.Config):

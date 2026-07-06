@@ -7,5 +7,5 @@ from .._model.db_model import DBModel
 def build_svg(model: DBModel, result_dir: Path, logger: BetterLogger):
 
     for schema in model.schemas:
-        ...
+        ... # TODO: implement this later
 

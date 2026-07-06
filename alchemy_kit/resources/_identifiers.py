@@ -16,9 +16,16 @@ class Identifiers:
     # Python keywords, builtins, and names the generated templates depend on.
     _RESERVED_PY_NAMES: frozenset[str] = frozenset(
         set(keyword.kwlist) | set(keyword.softkwlist) | set(dir(builtins)) | {
-            "to_model", "Meta", "Config", "BaseModel", "datetime", "date", "Series",
-            "Optional", "Any", "Decimal", "pa", "validate", "init", "strip_timezone",
-            "_get_model_attrs",
+            # base model
+            "get_unit", "Meta", "Config", "BaseModel", "validate", 
+            "strip_timezone",
+
+            # imports
+            "Optional", "Any", "Decimal", "pa",  "init", "date",
+            "Series", "datetime",
+
+            # object unit
+            "get_metadata", "set_alias", "get_reference"
         }
     )
 
@@ -30,12 +37,28 @@ class Identifiers:
     })
 
     # Characters illegal in a Python identifier / in a path segment on Windows
-    # (the latter is a superset of what POSIX forbids).
     _ILLEGAL_PY_CHARS = re.compile(r"[^0-9A-Za-z_]")
-    _ILLEGAL_FILE_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+    _ILLEGAL_FILE_CHARS = re.compile(r'[<>:"/\\|?*.\x00-\x1f]')
 
     def __init__(self) -> None:
         self._used: set[str] = set(self._RESERVED_PY_NAMES)
+
+    def valid_name(self, possible_name) -> str:
+        """Return a unique name that is both a valid Python identifier and a
+        filesystem-safe file/folder name, based on ``possible_name``.
+
+        Applies the filesystem sanitisation followed by the Python identifier
+        sanitisation, so any character illegal in either is replaced with
+        ``_`` and leading underscores are stripped. Raises ``ValueError`` when
+        no valid name can be formed (empty result, a leading digit, or a
+        Windows reserved device name). The chosen name is registered so it is
+        not handed out again.
+        """
+        return self._nonduplicated(
+            self._valid_py_object_name(
+                self._valid_explorer_name(possible_name)
+            )
+        )
 
     def valid_py_object_name(self, possible_name: str) -> str:
         """Return a unique, valid Python identifier based on ``possible_name``.
@@ -46,12 +69,17 @@ class Identifiers:
         when no valid name can be formed (empty result, or a leading digit).
         The chosen name is registered so it is not handed out again.
         """
+        return self._nonduplicated(
+            self._valid_py_object_name(possible_name)
+        )
+
+    def _valid_py_object_name(self, possible_name: str) -> str:
         name = self._ILLEGAL_PY_CHARS.sub("_", possible_name).lstrip("_")
 
         if not name or name[0].isdigit():
-            raise ValueError(f"cannot derive a valid Python name from {possible_name!r}")
+            raise ValueError(f"Cannot derive a valid Python name from {possible_name!r}")
 
-        return self._nonduplicated(name)
+        return name
 
     def valid_explorer_name(self, possible_name: str) -> str:
         """Return a unique, filesystem-safe file/folder name from ``possible_name``.
@@ -63,12 +91,17 @@ class Identifiers:
         device name). The chosen name is registered so it is not handed out
         again.
         """
+        return self._nonduplicated(
+            self._valid_explorer_name(possible_name)
+        )
+
+    def _valid_explorer_name(self, possible_name: str) -> str:
         name = self._ILLEGAL_FILE_CHARS.sub("_", possible_name).lstrip("_")
 
         if not name or name.upper() in self._RESERVED_FILE_NAMES:
-            raise ValueError(f"cannot derive a valid file/folder name from {possible_name!r}")
+            raise ValueError(f"Cannot derive a valid file/folder name from {possible_name!r}")
 
-        return self._nonduplicated(name)
+        return name
 
     def _nonduplicated(self, possible_name: str) -> str:
         """Return ``possible_name`` (or a numbered variant) not already used,

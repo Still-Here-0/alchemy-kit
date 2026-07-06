@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import ClassVar, Protocol, runtime_checkable
 
+from ...types.dialect_types import DialectTypes
+
 
 @runtime_checkable
 class ColumnLike(Protocol):
@@ -16,14 +18,22 @@ class ColumnLike(Protocol):
     scale: int | None
 
 
-class DialectParameterMap(ABC):
+class DialectMap[_TypeParameters: str](ABC):
     """Base class for per-dialect SQL <-> Python type resources.
 
-    Concrete dialects define their own ``SqlType`` ``Literal`` (the exhaustive
-    set of type names) and narrow ``py_types`` to ``dict[SqlType, str]`` so a
-    typo'd key is flagged statically; a runtime guard enforces completeness.
-    """
+    Generic over ``_TypeParameters``: the ``Literal`` of valid SQL type names
+    for the dialect (e.g. ``MssqlTypeParameters``). This carries the type-name
+    set at the *type level*, so callers holding a concrete map (or a model that
+    exposes one) get dialect-specific autocomplete on APIs typed against
+    ``_TypeParameters``.
 
+    Concrete dialects also narrow ``py_types`` to ``dict[SqlType, str]`` so a
+    typo'd key is flagged statically; a runtime guard enforces completeness.
+    ``dialect_paramaters`` is the runtime companion of ``_TypeParameters`` —
+    the same names as a ``frozenset`` for membership checks.
+    """
+    dialect: ClassVar[DialectTypes]
+    dialect_paramaters: ClassVar[frozenset[str]]
     py_types: ClassVar[dict[str, str]]
 
     @classmethod
@@ -40,7 +50,7 @@ class DialectParameterMap(ABC):
     @abstractmethod
     def render_type(cls, column: ColumnLike) -> str:
         """Render the fully-parameterised SQL type, e.g. ``nvarchar(200)``."""
-        ...
+        raise NotImplementedError("Method called from a abstract class")
 
     @classmethod
     def str_length(cls, column: ColumnLike) -> int | None:
@@ -49,4 +59,5 @@ class DialectParameterMap(ABC):
         Returns ``None`` when the column is not a length-bounded string type
         (e.g. numeric types, or unbounded strings such as ``varchar(max)``).
         """
-        ...
+        raise NotImplementedError("Method called from a abstract class")
+

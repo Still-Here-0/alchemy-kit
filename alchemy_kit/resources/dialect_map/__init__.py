@@ -1,18 +1,34 @@
-from ...types.dialect_types import DialectTypes
-from ._base import ColumnLike, DialectParameterMap
-from .mssql import MssqlParameterMap, MssqlTypeParameters
+from typing import NamedTuple
 
-_REGISTRY: dict[DialectTypes, type[DialectParameterMap]] = {
-    DialectTypes.MSSQL: MssqlParameterMap,
+from ...types.dialect_types import DialectTypes
+from ._base import ColumnLike, DialectMap
+from .mssql import MssqlMap
+
+
+class _DialectEntry(NamedTuple):
+    parameter_map: type[DialectMap]
+    # Type objects (Literal, Union, ...) does not carry the variable name
+    type_parameters: str
+
+
+_REGISTRY: dict[DialectTypes, _DialectEntry] = {
+    DialectTypes.MSSQL: _DialectEntry(MssqlMap, "MssqlTypeParameters"),
 }
 
 
-def get_map(dialect: DialectTypes) -> type[DialectParameterMap]:
+def get_map(dialect: DialectTypes) -> type[DialectMap]:
     """Return the resource class registered for ``dialect``."""
     try:
-        return _REGISTRY[dialect]
+        return _REGISTRY[dialect].parameter_map
     except KeyError:
         raise ValueError(f"Dialect not mapped on dialect_map: {dialect}") from None
+
+
+def get_codegen_imports(dialect: DialectTypes) -> tuple[str, str, str]:
+    """Return the ``(map_module, map_class, type_parameters)`` identifiers a
+    generated model needs to reference ``dialect``."""
+    parameter_map = get_map(dialect)
+    return parameter_map.__module__, parameter_map.__name__, _REGISTRY[dialect].type_parameters
 
 
 def get_type(dialect: DialectTypes, sql_type: str) -> str:
@@ -32,8 +48,8 @@ def get_str_length(dialect: DialectTypes, column: ColumnLike) -> int | None:
 
 __all__ = [
     "ColumnLike",
-    "DialectParameterMap",
-    "MssqlTypeParameters",
+    "DialectMap",
+    "get_codegen_imports",
     "get_map",
     "get_str_length",
     "get_type",

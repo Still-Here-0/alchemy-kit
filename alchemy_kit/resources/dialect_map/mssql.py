@@ -1,10 +1,12 @@
 from typing import cast, get_args
 
-from ._base import ColumnLike, DialectParameterMap
-from ...types._sql_type_parameters import MssqlTypeParameters
+from alchemy_kit.types.dialect_types import DialectTypes
+
+from ._base import ColumnLike, DialectMap
+from ...types.sql_type_parameters import MssqlTypeParameters
 
 
-class MssqlParameterMap(DialectParameterMap):
+class MssqlMap(DialectMap[MssqlTypeParameters]):
 
     _PY_TYPES: dict[MssqlTypeParameters, str] = {
         # Integers
@@ -47,7 +49,6 @@ class MssqlParameterMap(DialectParameterMap):
         "rowversion": "Any",
         "sql_variant": "Any",
     }
-    py_types = cast(dict[str, str], _PY_TYPES)
 
     # SQL type name buckets
     _length_types_char: set[MssqlTypeParameters] = {"char", "varchar"}        # 1 byte/char
@@ -56,6 +57,11 @@ class MssqlParameterMap(DialectParameterMap):
     _numerical_parametise: set[MssqlTypeParameters] = {"decimal", "numeric"}
     _numerical_approximation: MssqlTypeParameters = "float"
     _date_types: set[MssqlTypeParameters] = {"time", "datetime2", "datetimeoffset"}
+
+    # Parent parameters
+    py_types = cast(dict[str, str], _PY_TYPES)
+    dialect = DialectTypes.MSSQL
+    dialect_paramaters = frozenset(get_args(MssqlTypeParameters))
 
     @classmethod
     def render_type(cls, column: ColumnLike) -> str:
@@ -102,5 +108,5 @@ class MssqlParameterMap(DialectParameterMap):
 
 # Pyright checks that every key we *write* is a valid MssqlType, but not that
 # all members are present. This guard closes that gap at import time.
-_missing = set(get_args(MssqlTypeParameters)) - MssqlParameterMap.py_types.keys()
+_missing = set(get_args(MssqlTypeParameters)) - MssqlMap.py_types.keys()
 assert not _missing, f"MssqlMap.py_types is missing SQL types: {sorted(_missing)}"

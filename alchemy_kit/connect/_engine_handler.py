@@ -1,4 +1,4 @@
-from typing import Sequence, cast
+from typing import Literal, Sequence, cast
 
 import pandas as pd
 import sqlalchemy
@@ -63,7 +63,7 @@ class EngineHandler:
             if isinstance(sql.query_parameters, Sequence):
                 result = conn.execute(query, sql.query_parameters)
             else:
-                result = self._bind_parameters(conn, query, sql.query_parameters)
+                result = self._execute_with_binded_parameters(conn, query, sql.query_parameters)
 
             if sql.f_check(conn):
                 row_count = result.rowcount
@@ -75,7 +75,7 @@ class EngineHandler:
 
             return row_count, data
 
-    def _bind_parameters(self, conn: sqlalchemy.Connection, query: sqlalchemy.TextClause, parameters: SqlParamMap) -> sqlalchemy.CursorResult:
+    def _execute_with_binded_parameters(self, conn: sqlalchemy.Connection, query: sqlalchemy.TextClause, parameters: SqlParamMap) -> sqlalchemy.CursorResult:
         binds = [
             sqlalchemy.bindparam(key, value, expanding=isinstance(value, SqlExpandType))
             for key, value in parameters.items()
@@ -88,10 +88,18 @@ class EngineHandler:
     def insert_data(
         self,
         data: pd.DataFrame,
+        database_name: str,
         table_name: str,
         schema_name: str,
         *,
         truncate: bool = False,
-    ): # TODO: validate it after builder is implemented
-        ...
+        if_exists: Literal["fail", "replace", "append", "delete_rows"] = "append"
+    ) -> int | None:
+        table_ref = f"{database_name}.{schema_name}.{table_name}"
+
+        with self._engine.connect() as conn:
+            if truncate:
+                conn.execute(sqlalchemy.text(f"TRUNCATE TABLE {table_ref}"))
+
+            return data.to_sql(table_name, conn, schema=schema_name, if_exists=if_exists)
 

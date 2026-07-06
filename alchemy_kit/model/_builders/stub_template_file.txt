@@ -7,3 +7,20 @@
 # To update this file, modify the source database and re-run the builder script.
 #
 # --------------------------------------------------------------------------------
+
+from {base_model_module} import BaseModel
+from {object_unit_module} import ObjectUnit
+from {column_unit_module} import ColumnUnit
+from {type_parameters_module} import {type_parameters}
+from datetime import datetime, date
+from pandera.typing import Series
+from typing import Any
+
+class {class_name}(BaseModel[{type_parameters}]):
+    :columns
+
+    @classmethod
+    def get_unit(cls) -> {class_name}_Unit: ...
+
+class {class_name}_Unit(ObjectUnit[{type_parameters}]):
+    :unit_columns

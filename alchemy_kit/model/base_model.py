@@ -1,12 +1,18 @@
 
-from pandera.pandas import DataFrameModel
-from pandera.api.base.model import MetaModel
-from pandera.typing import DataFrame
-from typing import Self, TypedDict, cast
 import copy
-import pandas as pd
+from typing import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, cast
 
+import pandas as pd
+from pandera.api.base.model import MetaModel
+from pandera.pandas import DataFrameModel
+from pandera.typing import DataFrame
+
+from ..resources.dialect_map import DialectMap
+from ..types.dialect_types import DialectTypes
 from ..types.errors._model_validation_error import ModelValidationError
+
+if TYPE_CHECKING:
+    from .units.object_unit import ObjectUnit
 
 
 class MetaData(TypedDict):
@@ -21,7 +27,9 @@ class _BaseModelMeta(MetaModel):
     def __init__(self, name, bases, namespace) -> None:
         super().__init__(name, bases, namespace)
 
-class BaseModel(DataFrameModel, metaclass=_BaseModelMeta):
+class BaseModel[_TypeParameters: str](DataFrameModel, metaclass=_BaseModelMeta):
+    _dialect: ClassVar[DialectTypes]
+    _map: ClassVar[type[DialectMap[Any]]]
 
     @classmethod
     def _strip_timezone(cls, df: pd.DataFrame) -> pd.DataFrame:
@@ -91,8 +99,12 @@ class BaseModel(DataFrameModel, metaclass=_BaseModelMeta):
             raise ModelValidationError(f"[{cls.__name__}] {exc}") from exc
     
     @classmethod
-    def to_model(cls):
-        ... # TODO: Make this after builder is implemented
+    def get_unit(cls) -> "ObjectUnit[_TypeParameters]":
+        """Return an :class:`ObjectUnit` for this model, dialect-typed so column
+        access and ``cast`` autocomplete the model's own SQL type names."""
+        from .units.object_unit import ObjectUnit
+
+        return ObjectUnit(cls)
 
     class Config(DataFrameModel.Config):
         coerce = True

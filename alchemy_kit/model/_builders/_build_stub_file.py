@@ -1,18 +1,66 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from ...resources._dialect_map import get_str_length, get_type
-from ...resources._identifiers import Identifiers
-from ...types import DialectTypes
+from ...resources.dialect_map import get_codegen_imports, get_type
+from ...types import DialectTypes, sql_type_parameters
 from .._model.column_model import ColumnModel
 from .._model.object_model import ObjectModel
-from ._column_metadata import ColumnMetadata, ForeignKeyMeta
+from ..base_model import BaseModel
+from ..units.column_unit import ColumnUnit
+from ..units.object_unit import ObjectUnit
 
 
 @dataclass(kw_only=True)
 class StubFileBuilder:
-    template: ClassVar[Path] = Path(__file__).resolve().parent/"py_template_file.txt"
-    column_template: ClassVar[str] = "    {column_name}: {column_type} = pa.Field({column_parameters})"
-    identifiers: Identifiers = field(default_factory=Identifiers, init=False, repr=False)
+    template: ClassVar[Path] = Path(__file__).resolve().parent/"stub_template_file.txt"
 
+    schema_name: str
+    class_name: str
+    file_path: Path
+    object_model: ObjectModel
+    db_dialect: DialectTypes
+    column_names: dict[str, str]
+
+    def build(self) -> str:
+        _, _, type_parameters = get_codegen_imports(self.db_dialect)
+
+        template = self.template.read_text("UTF-8").format(
+            class_name=self.class_name,
+            base_model_module=BaseModel.__module__,
+            object_unit_module=ObjectUnit.__module__,
+            column_unit_module=ColumnUnit.__module__,
+            type_parameters_module=sql_type_parameters.__name__,
+            type_parameters=type_parameters,
+        )
+
+        columns = [
+            (self.column_names[name], column_model)
+            for name, column_model in self.object_model.columns.items()
+        ]
+
+        model_columns = [
+            f"    {name}: {self._get_column_type(column_model)}"
+            for name, column_model in columns
+        ]
+        unit_columns = [
+            f"    {name}: ColumnUnit[{type_parameters}]"
+            for name, _ in columns
+        ]
+
+        lines = template.splitlines()
+        self._replace_marker(lines, "    :columns", model_columns)
+        self._replace_marker(lines, "    :unit_columns", unit_columns)
+
+        file_data = '\n'.join(lines)
+        self.file_path.write_text(file_data, "UTF-8")
+        return file_data
+
+    def _get_column_type(self, column_model: ColumnModel) -> str:
+        py_type = get_type(self.db_dialect, column_model.type)
+        return f"Series[{py_type}]"
+
+    @staticmethod
+    def _replace_marker(lines: list[str], marker: str, block: list[str]) -> None:
+        idx = lines.index(marker)
+        lines[idx:idx + 1] = block or ["    ..."]

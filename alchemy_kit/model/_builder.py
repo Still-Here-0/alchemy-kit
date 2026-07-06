@@ -3,7 +3,6 @@ from pathlib import Path
 
 from ..connect._info import ConnectionInfo
 from ..resources._better_logger import BetterLogger
-from ..resources.dir_helpers import find_project_root
 from . import _builders
 from ._schema_config import SchemaConfig
 from ._utils import clear_dir, parse_db
@@ -15,7 +14,6 @@ def build(
         *, 
         schema_config: SchemaConfig | None = None,
         clear_result_dir: bool = False,
-        root_dir: Path | None = None,
         logger: Logger | BetterLogger | None = None,
     ):
     if result_dir.is_file():
@@ -23,9 +21,6 @@ def build(
 
     if schema_config is None:
         schema_config = SchemaConfig()
-
-    if root_dir is None:
-        root_dir = find_project_root()
 
     if not isinstance(logger, BetterLogger):
         logger = BetterLogger(logger)
@@ -36,7 +31,7 @@ def build(
     # TODO: log init builder
 
     model = parse_db(conn_info, schema_config, logger)
-    _builders.build_model(model, result_dir, root_dir, logger)
+    _builders.build_model(model, result_dir, logger)
 
 def build_svg(conn_info: ConnectionInfo, result_path: Path, *, schema_config: SchemaConfig | None = None, logger: Logger | BetterLogger | None):
     if result_path.suffix != ".svg":

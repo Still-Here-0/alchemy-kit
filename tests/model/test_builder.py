@@ -1,14 +1,85 @@
+import shutil
 from pathlib import Path
+from typing import cast
 
-from alchemy_kit.connect.info_builder import from_env
+import pytest
+
+from alchemy_kit.connect._info import ConnectionInfo
 from alchemy_kit.model import build
-from alchemy_kit.model import SchemaConfig
+from alchemy_kit.model import _builder
+from alchemy_kit.model._model.column_model import ColumnModel
+from alchemy_kit.model._model.db_model import DBModel
+from alchemy_kit.model._model.object_model import ObjectModel
+from alchemy_kit.model._model.schema_model import SchemaModel
+from alchemy_kit.types.dialect_types import DialectTypes
 
 
-def test_builder_raises_on_non_dir():
-    DIR = Path(__file__).resolve().parent.parent
-    info = from_env(DIR / ".env")
-    config = SchemaConfig()
-    config.include_schema("ghcloudops")
-    build(info, DIR / "secret_model", schema_config=config, clear_result_dir=True)
+PREVIEW_DIR = Path(__file__).resolve().parent.parent / "secret_model_preview"
+
+def _column(name: str, column_type: str, *, nullable: bool = False) -> ColumnModel:
+    return ColumnModel(
+        name=name,
+        column_type=column_type,
+        is_nullable=nullable,
+        is_identity=False,
+        is_computed=False,
+        max_length=None,
+        precision=None,
+        scale=None,
+        collation_name=None,
+        has_default=False,
+        default=None,
+        is_unique=False,
+        is_primary_key=False,
+        is_foreign_key=False,
+        description=None,
+        fk_ref=None,
+    )
+
+def _object(name: str, columns: list[ColumnModel]) -> ObjectModel:
+    obj = ObjectModel(name, "Table", None)
+    for column in columns:
+        obj.columns[column.name] = column
+    return obj
+
+def _fake_model() -> DBModel:
+    model = DBModel("testdb", DialectTypes.MSSQL)
+
+    dbo = SchemaModel("dbo")
+    dbo.objects["users"] = _object("users", [_column("id", "int"), _column("email", "varchar", nullable=True)])
+    dbo.objects["orders"] = _object("orders", [_column("id", "int"), _column("total", "decimal")])
+
+    audit = SchemaModel("audit")
+    audit.objects["users"] = _object("users", [_column("id", "int")])
+
+    model.schemas["dbo"] = dbo
+    model.schemas["audit"] = audit
+    return model
+
+def test_build_generates_package(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(_builder, "parse_db", lambda *args, **kwargs: _fake_model())
+
+    shutil.rmtree(PREVIEW_DIR, ignore_errors=True)
+    result_dir = PREVIEW_DIR
+    build(cast(ConnectionInfo, None), result_dir)
+
+    assert (result_dir / "__init__.py").exists()
+    for schema in ("dbo", "audit"):
+        assert (result_dir / schema / "__init__.py").exists()
+
+    for module in ("users_MODULE", "orders_MODULE"):
+        assert (result_dir / "dbo" / f"{module}.py").exists()
+        assert (result_dir / "dbo" / f"{module}.pyi").exists()
+
+    assert (result_dir / "audit" / "users_MODULE.py").exists()
+    assert (result_dir / "audit" / "users_MODULE.pyi").exists()
+
+    assert (result_dir / "dbo" / "__init__.py").read_text().splitlines() == [
+        "from .users_MODULE import users",
+        "from .orders_MODULE import orders",
+    ]
+    assert (result_dir / "audit" / "__init__.py").read_text().strip() == "from .users_MODULE import users"
+
+    for path in result_dir.rglob("*.py*"):
+        compile(path.read_text(), str(path), "exec")
 

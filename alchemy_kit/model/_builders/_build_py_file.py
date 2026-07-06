@@ -2,11 +2,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
 
-from ...resources._dialect_map import get_str_length, get_type
 from ...resources._identifiers import Identifiers
-from ...types import DialectTypes
+from ...resources.dialect_map import get_codegen_imports, get_str_length, get_type
+from ...types import DialectTypes, sql_type_parameters
 from .._model.column_model import ColumnModel
 from .._model.object_model import ObjectModel
+from ..base_model import BaseModel
 from ._column_metadata import ColumnMetadata, ForeignKeyMeta
 
 
@@ -15,6 +16,7 @@ class PyFileBuilder:
     template: ClassVar[Path] = Path(__file__).resolve().parent/"py_template_file.txt"
     column_template: ClassVar[str] = "    {column_name}: {column_type} = pa.Field({column_parameters})"
     identifiers: Identifiers = field(default_factory=Identifiers, init=False, repr=False)
+    column_names: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
     schema_name: str
     class_name: str
@@ -22,10 +24,25 @@ class PyFileBuilder:
     object_model: ObjectModel
     db_dialect: DialectTypes
 
+    def __post_init__(self) -> None:
+        self.column_names = {
+            name: self.identifiers.valid_py_object_name(name)
+            for name in self.object_model.columns
+        }
+
     def build(self) -> str:
+        map_module, parameter_map, type_parameters = get_codegen_imports(self.db_dialect)
+
         template = self.template.read_text("UTF-8")
         template = template.format(
             class_name=self.class_name,
+            dialect=f"DialectTypes.{self.db_dialect.name}",
+            base_model_module=BaseModel.__module__,
+            dialect_types_module=DialectTypes.__module__,
+            type_parameters_module=sql_type_parameters.__name__,
+            type_parameters=type_parameters,
+            parameter_map_module=map_module,
+            parameter_map=parameter_map,
             unique=f"unique={self.object_model.get_unique_constrait()!r}",
             metadata=self._get_object_metadata(),
         )
@@ -35,7 +52,7 @@ class PyFileBuilder:
 
         for column_name, column_data in self.object_model.columns.items():
             column = self.column_template.format(
-                column_name=self.identifiers.valid_py_object_name(column_name),
+                column_name=self.column_names[column_name],
                 column_type=self._get_column_type(column_data),
                 column_parameters=self._get_column_parameters(column_data),
             )
