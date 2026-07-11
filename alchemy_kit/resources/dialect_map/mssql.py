@@ -2,7 +2,7 @@ from typing import cast, get_args
 
 from alchemy_kit.types.dialect_types import DialectTypes
 
-from ._base import ColumnLike, DialectMap
+from ._base import ColumnLike, DialectMap, ReflectedTypeFacts
 from ...types.sql_type_parameters import MssqlTypeParameters
 
 
@@ -62,6 +62,19 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
     py_types = cast(dict[str, str], _PY_TYPES)
     dialect = DialectTypes.MSSQL
     dialect_paramaters = frozenset(get_args(MssqlTypeParameters))
+
+    @classmethod
+    def reflected_type_facts(cls, sa_type: object) -> ReflectedTypeFacts:
+        """SQL Server convention: ``sys.columns.max_length`` is in *bytes*, so
+        Unicode string lengths reported in characters by reflection are doubled
+        to keep both extraction paths on the byte convention ``str_length``
+        expects."""
+        facts = super().reflected_type_facts(sa_type)
+
+        if facts.sql_type in cls._length_types_nchar and facts.max_length > 0:
+            facts = facts._replace(max_length=facts.max_length * 2)
+
+        return facts
 
     @classmethod
     def render_type(cls, column: ColumnLike) -> str:

@@ -1,7 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import ClassVar, Protocol, runtime_checkable
+from typing import Any, ClassVar, NamedTuple, Protocol, runtime_checkable
 
 from ...types.dialect_types import DialectTypes
+
+
+class ReflectedTypeFacts(NamedTuple):
+    """Column type facts extracted from a reflected SQLAlchemy type object,
+    normalized to the same conventions the dialect ``.sql`` metadata queries
+    use (``max_length == -1`` for unbounded strings, ``0`` when a parameter
+    does not apply)."""
+
+    sql_type: str
+    max_length: int
+    precision: int
+    scale: int
+    collation: str | None
 
 
 @runtime_checkable
@@ -45,6 +58,31 @@ class DialectMap[_TypeParameters: str](ABC):
             raise ValueError(
                 f"{cls.__name__}: no Python mapping for SQL type {sql_type!r}"
             ) from None
+
+    @classmethod
+    def reflected_type_facts(cls, sa_type: Any) -> ReflectedTypeFacts:
+        """Extract ``(sql_type, max_length, precision, scale, collation)`` from
+        a reflected SQLAlchemy type object.
+
+        The type name is the lowercased class name, which for dialect-specific
+        reflected types matches the dialect's SQL type name (``NVARCHAR`` ->
+        ``nvarchar``). A string type whose ``length`` is ``None`` is unbounded
+        and reported as ``-1``; parameters a type does not carry are ``0``.
+        Dialects with different conventions override this.
+        """
+        length = getattr(sa_type, "length", None)
+        if hasattr(sa_type, "length") and length is None:
+            max_length = -1
+        else:
+            max_length = length or 0
+
+        return ReflectedTypeFacts(
+            sql_type=type(sa_type).__name__.lower(),
+            max_length=max_length,
+            precision=getattr(sa_type, "precision", None) or 0,
+            scale=getattr(sa_type, "scale", None) or 0,
+            collation=getattr(sa_type, "collation", None),
+        )
 
     @classmethod
     @abstractmethod

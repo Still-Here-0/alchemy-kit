@@ -1,1 +1,99 @@
-# TODO: SQLite dialect map not implemented yet.
+from typing import cast, get_args
+
+from alchemy_kit.types.dialect_types import DialectTypes
+
+from ._base import ColumnLike, DialectMap, ReflectedTypeFacts
+from ...types.sql_type_parameters import SqliteTypeParameters
+
+
+class SqliteMap(DialectMap[SqliteTypeParameters]):
+
+    _PY_TYPES: dict[SqliteTypeParameters, str] = {
+        # INTEGER affinity
+        "int": "int",
+        "integer": "int",
+        "tinyint": "int",
+        "smallint": "int",
+        "mediumint": "int",
+        "bigint": "int",
+        "unsigned big int": "int",
+        "int2": "int",
+        "int8": "int",
+        # REAL affinity
+        "real": "float",
+        "double": "float",
+        "double precision": "float",
+        "float": "float",
+        # NUMERIC affinity (Decimal is not imported by the template, so use float)
+        "numeric": "float",
+        "decimal": "float",
+        "boolean": "bool",
+        "date": "date",
+        "datetime": "datetime",
+        # TEXT affinity
+        "character": "str",
+        "varchar": "str",
+        "varying character": "str",
+        "nchar": "str",
+        "native character": "str",
+        "nvarchar": "str",
+        "text": "str",
+        "clob": "str",
+        # BLOB affinity
+        "blob": "Any",
+    }
+
+    # SQL type name buckets (SQLite ignores length constraints, but declared
+    # lengths are preserved for rendering and validation)
+    _length_types_char: set[SqliteTypeParameters] = {
+        "character", "varchar", "varying character",
+        "nchar", "native character", "nvarchar",
+    }
+    _numerical_parametise: set[SqliteTypeParameters] = {"decimal", "numeric"}
+
+    # Parent parameters
+    py_types = cast(dict[str, str], _PY_TYPES)
+    dialect = DialectTypes.SQLITE
+    dialect_paramaters = frozenset(get_args(SqliteTypeParameters))
+
+    @classmethod
+    def reflected_type_facts(cls, sa_type: object) -> ReflectedTypeFacts:
+        """SQLAlchemy spells multi-word type names with underscores in class
+        names (``DOUBLE_PRECISION``), so they are normalized back to the SQL
+        spelling (``double precision``) to match the dialect type names."""
+        facts = super().reflected_type_facts(sa_type)
+        return facts._replace(sql_type=facts.sql_type.replace("_", " "))
+
+    @classmethod
+    def render_type(cls, column: ColumnLike) -> str:
+        t = column.type.lower()
+
+        if t in cls._length_types_char:
+            if column.max_length is None or column.max_length <= 0:
+                return t
+            return f"{t}({column.max_length})"
+
+        if t in cls._numerical_parametise:
+            if column.precision is None or column.precision == 0:
+                return t
+            if column.scale is None or column.scale == 0:
+                return f"{t}({column.precision})"
+            return f"{t}({column.precision}, {column.scale})"
+
+        return t
+
+    @classmethod
+    def str_length(cls, column: ColumnLike) -> int | None:
+        t = column.type.lower()
+
+        if column.max_length is None or column.max_length <= 0:
+            return None
+        if t in cls._length_types_char:
+            return column.max_length
+        return None
+
+
+# Pyright checks that every key we *write* is a valid SqliteType, but not that
+# all members are present. This guard closes that gap at import time.
+_missing = set(get_args(SqliteTypeParameters)) - SqliteMap.py_types.keys()
+assert not _missing, f"SqliteMap.py_types is missing SQL types: {sorted(_missing)}"
