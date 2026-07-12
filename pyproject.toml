@@ -9,9 +9,17 @@ dependencies = [
     "pandas>=3.0.3",
     "pandera>=0.31.1",
     "pydantic>=2.13.4",
-    "pyodbc>=5.3.0",
     "sqlalchemy>=2.0.50",
+    "sqlglot>=26.0.0",
 ]
+
+[project.optional-dependencies]
+mssql = ["pyodbc>=5.3.0"]
+mysql = ["pymysql>=1.1.0"]
+mariadb = ["pymysql>=1.1.0"]
+postgresql = ["psycopg[binary]>=3.1.0"]
+oracle = ["oracledb>=2.0.0"]
+all = ["alchemy-kit[mssql,mysql,mariadb,postgresql,oracle]"]
 
 [build-system]
 requires = ["hatchling"]
