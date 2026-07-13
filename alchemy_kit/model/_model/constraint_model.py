@@ -26,6 +26,19 @@ class ForeignKeyConstraintModel:
         self.on_update = on_update
 
 
+class FilteredUniqueIndexModel:
+    """A unique index restricted by a WHERE clause (partial/filtered index).
+
+    Uniqueness only holds among rows matching ``definition``, so it must not be
+    folded into an unconditional unique constraint.
+    """
+
+    def __init__(self, name: str, columns: list[str], definition: str) -> None:
+        self.name = name
+        self.columns = columns
+        self.definition = definition
+
+
 class CheckConstraintModel:
     """A CHECK constraint on a table/view.
 

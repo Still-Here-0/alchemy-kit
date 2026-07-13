@@ -1,5 +1,5 @@
 from .column_model import ColumnModel
-from .constraint_model import CheckConstraintModel, ForeignKeyConstraintModel
+from .constraint_model import CheckConstraintModel, FilteredUniqueIndexModel, ForeignKeyConstraintModel
 from ...types._sql_utilities import ObjectType
 
 
@@ -13,6 +13,7 @@ class ObjectModel:
         self._unique_constrait: set[frozenset[str]] = set()
         self.foreign_keys: dict[str, ForeignKeyConstraintModel] = {}
         self.check_constraints: dict[str, CheckConstraintModel] = {}
+        self.filtered_unique_indexes: dict[str, FilteredUniqueIndexModel] = {}
 
     def add_unique_constrait(self, col_names: list[str]):
         keys = list(self.columns.keys())

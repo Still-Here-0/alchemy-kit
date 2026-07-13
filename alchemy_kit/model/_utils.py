@@ -10,16 +10,19 @@ from ..connect._info import ConnectionInfo
 from ..resources._better_logger import BetterLogger
 from ..types._sql_utilities import ObjectType
 from ._model.column_model import ColumnModel, ForeignKeyModel
-from ._model.constraint_model import CheckConstraintModel, ForeignKeyConstraintModel
+from ._model.constraint_model import CheckConstraintModel, FilteredUniqueIndexModel, ForeignKeyConstraintModel
 from ._model.db_model import DBModel
 from ._model.object_model import ObjectModel
 from ._model.schema_model import SchemaModel
-from ._model_def.list_check_constraints import ListCheckConstraints
-from ._model_def.list_columns import ListColumns
-from ._model_def.list_columns_cluster import ListUniqueClusters
-from ._model_def.list_foreign_keys import ListForeignKeys
-from ._model_def.list_objects import ListObjects
-from ._model_def.list_schemas import ListSchemas
+from ._model_def import (
+    ListCheckConstraints,
+    ListColumns,
+    ListForeignKeys,
+    ListObjects,
+    ListSchemas,
+    ListUniqueClusters,
+    MetadataExtractor,
+)
 from ._schema_config import SchemaConfig
 
 
@@ -36,13 +39,14 @@ def parse_db(conn_info: ConnectionInfo, schema_conf: SchemaConfig, logger: Bette
     
     with EngineManager(None) as manager:
         handler = manager.create_engine(conn_info)
-        schema_data = ListSchemas.get_data(handler, schema_conf)
+        extractor = MetadataExtractor(handler)
+        schema_data = extractor.list_schemas(schema_conf)
         for _, row in schema_data.iterrows():
             schema_name: str = row[ListSchemas.name]
             sql_schema = SchemaModel(schema_name)
             db.schemas[schema_name] = sql_schema
 
-            object_data = ListObjects.get_data(handler, schema_conf, schema_name)
+            object_data = extractor.list_objects(schema_conf, schema_name)
             for _, row in object_data.iterrows():
                 object_name: str = row[ListObjects.object_name]
                 object_type: ObjectType = row[ListObjects.object_type]
@@ -50,7 +54,7 @@ def parse_db(conn_info: ConnectionInfo, schema_conf: SchemaConfig, logger: Bette
                 sql_object = ObjectModel(object_name, object_type, object_desc)
                 sql_schema.objects[object_name] = sql_object
 
-                column_data = ListColumns.get_data(handler, schema_name, object_name)
+                column_data = extractor.list_columns(schema_name, object_name)
                 for _, row in column_data.iterrows():
                     fk_ref = None
                     if row[ListColumns.is_foreign_key]:
@@ -80,15 +84,25 @@ def parse_db(conn_info: ConnectionInfo, schema_conf: SchemaConfig, logger: Bette
                     )
                     sql_object.columns[column.name] = column
 
-                column_cluster_data = ListUniqueClusters.get_data(handler, schema_name, object_name)
+                column_cluster_data = extractor.list_unique_clusters(schema_name, object_name)
                 for _, row in column_cluster_data.iterrows():
                     if not row[ListUniqueClusters.is_unique]:
                         continue
 
                     col_names = [col.strip() for col in row[ListUniqueClusters.columns].split(", ")]
-                    sql_object.add_unique_constrait(col_names)
+                    filter_definition = none_if_na(row[ListUniqueClusters.filter_definition])
 
-                fk_data = ListForeignKeys.get_data(handler, schema_name, object_name)
+                    if filter_definition is not None:
+                        filtered_index = FilteredUniqueIndexModel(
+                            name=row[ListUniqueClusters.key_name],
+                            columns=col_names,
+                            definition=filter_definition,
+                        )
+                        sql_object.filtered_unique_indexes[filtered_index.name] = filtered_index
+                    else:
+                        sql_object.add_unique_constrait(col_names)
+
+                fk_data = extractor.list_foreign_keys(schema_name, object_name)
                 for _, row in fk_data.iterrows():
                     fk_columns = [col.strip() for col in row[ListForeignKeys.columns].split(", ")]
                     fk_ref_columns = [col.strip() for col in row[ListForeignKeys.ref_columns].split(", ")]
@@ -103,7 +117,7 @@ def parse_db(conn_info: ConnectionInfo, schema_conf: SchemaConfig, logger: Bette
                     )
                     sql_object.foreign_keys[foreign_key.name] = foreign_key
 
-                check_data = ListCheckConstraints.get_data(handler, schema_name, object_name)
+                check_data = extractor.list_check_constraints(schema_name, object_name)
                 for _, row in check_data.iterrows():
                     check = CheckConstraintModel(
                         name=row[ListCheckConstraints.check_name],

@@ -2,13 +2,17 @@ from typing import cast, get_args
 
 from alchemy_kit.types.dialect_types import DialectTypes
 
-from ._base import ColumnLike, DialectMap, ReflectedTypeFacts
+from sqlalchemy.dialects import postgresql as sa_pg
+from sqlalchemy.types import NullType
+
+from ._base import ColumnLike, DialectMap, ReflectedTypeFacts, SaTypeFactory
+from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import PostgresqlTypeParameters
 
 
 class PostgresqlMap(DialectMap[PostgresqlTypeParameters]):
 
-    _PY_TYPES: dict[PostgresqlTypeParameters, str] = {
+    _PY_TYPES: dict[PostgresqlTypeParameters, PyTypeParameters] = {
         # Integers
         "smallint": "int",
         "integer": "int",
@@ -92,6 +96,98 @@ class PostgresqlMap(DialectMap[PostgresqlTypeParameters]):
         # XML / other
         "xml": "str",
         "oid": "int",
+        # Reflection-emitted names
+        "enum": "str",
+        "array": "Any",
+    }
+
+    _SA_TYPES: dict[PostgresqlTypeParameters, SaTypeFactory] = {
+        # Integers
+        "smallint": sa_pg.SMALLINT,
+        "integer": sa_pg.INTEGER,
+        "int": sa_pg.INTEGER,
+        "int2": sa_pg.SMALLINT,
+        "int4": sa_pg.INTEGER,
+        "bigint": sa_pg.BIGINT,
+        "int8": sa_pg.BIGINT,
+        # Auto-increment
+        "smallserial": sa_pg.SMALLINT,
+        "serial": sa_pg.INTEGER,
+        "serial2": sa_pg.SMALLINT,
+        "serial4": sa_pg.INTEGER,
+        "bigserial": sa_pg.BIGINT,
+        "serial8": sa_pg.BIGINT,
+        # Boolean
+        "boolean": sa_pg.BOOLEAN,
+        "bool": sa_pg.BOOLEAN,
+        # Exact numerics
+        "decimal": sa_pg.NUMERIC,
+        "numeric": sa_pg.NUMERIC,
+        # Approximate numerics
+        "real": sa_pg.REAL,
+        "float4": sa_pg.REAL,
+        "double precision": sa_pg.DOUBLE_PRECISION,
+        "float8": sa_pg.DOUBLE_PRECISION,
+        "money": sa_pg.MONEY,
+        # Character strings
+        "character": sa_pg.CHAR,
+        "char": sa_pg.CHAR,
+        "character varying": sa_pg.VARCHAR,
+        "varchar": sa_pg.VARCHAR,
+        "bpchar": sa_pg.CHAR,
+        "text": sa_pg.TEXT,
+        "name": sa_pg.TEXT,
+        # Date / time
+        "date": sa_pg.DATE,
+        "timestamp": sa_pg.TIMESTAMP,
+        "timestamp without time zone": sa_pg.TIMESTAMP,
+        "timestamp with time zone": lambda: sa_pg.TIMESTAMP(timezone=True),
+        "timestamptz": lambda: sa_pg.TIMESTAMP(timezone=True),
+        "time": sa_pg.TIME,
+        "time without time zone": sa_pg.TIME,
+        "time with time zone": lambda: sa_pg.TIME(timezone=True),
+        "timetz": lambda: sa_pg.TIME(timezone=True),
+        "interval": sa_pg.INTERVAL,
+        # Binary
+        "bytea": sa_pg.BYTEA,
+        # UUID
+        "uuid": sa_pg.UUID,
+        # JSON
+        "json": sa_pg.JSON,
+        "jsonb": sa_pg.JSONB,
+        # Bit strings
+        "bit": sa_pg.BIT,
+        "bit varying": lambda: sa_pg.BIT(varying=True),
+        "varbit": lambda: sa_pg.BIT(varying=True),
+        # Network address
+        "cidr": sa_pg.CIDR,
+        "inet": sa_pg.INET,
+        "macaddr": sa_pg.MACADDR,
+        "macaddr8": sa_pg.MACADDR8,
+        # Geometric
+        "point": NullType,
+        "line": NullType,
+        "lseg": NullType,
+        "box": NullType,
+        "path": NullType,
+        "polygon": NullType,
+        "circle": NullType,
+        # Range
+        "int4range": sa_pg.INT4RANGE,
+        "int8range": sa_pg.INT8RANGE,
+        "numrange": sa_pg.NUMRANGE,
+        "tsrange": sa_pg.TSRANGE,
+        "tstzrange": sa_pg.TSTZRANGE,
+        "daterange": sa_pg.DATERANGE,
+        # Text search
+        "tsvector": sa_pg.TSVECTOR,
+        "tsquery": sa_pg.TSQUERY,
+        # XML / other
+        "xml": NullType,
+        "oid": sa_pg.OID,
+        # Reflection-emitted names
+        "enum": NullType,
+        "array": NullType,
     }
 
     # SQL type name buckets (PostgreSQL lengths are in characters)
@@ -106,7 +202,8 @@ class PostgresqlMap(DialectMap[PostgresqlTypeParameters]):
     }
 
     # Parent parameters
-    py_types = cast(dict[str, str], _PY_TYPES)
+    py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
+    sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     dialect = DialectTypes.POSTGRESQL
     dialect_paramaters = frozenset(get_args(PostgresqlTypeParameters))
 
@@ -159,3 +256,5 @@ class PostgresqlMap(DialectMap[PostgresqlTypeParameters]):
 # that all members are present. This guard closes that gap at import time.
 _missing = set(get_args(PostgresqlTypeParameters)) - PostgresqlMap.py_types.keys()
 assert not _missing, f"PostgresqlMap.py_types is missing SQL types: {sorted(_missing)}"
+_missing = set(get_args(PostgresqlTypeParameters)) - PostgresqlMap.sa_types.keys()
+assert not _missing, f"PostgresqlMap.sa_types is missing SQL types: {sorted(_missing)}"

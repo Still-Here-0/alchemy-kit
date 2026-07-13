@@ -1,7 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, NamedTuple, Protocol, runtime_checkable
+from typing import Any, Callable, ClassVar, NamedTuple, Protocol, runtime_checkable
+
+import sqlalchemy as sa
 
 from ...types.dialect_types import DialectTypes
+from ...types.py_type_parameters import PyTypeParameters
+
+type SaTypeFactory = Callable[[], sa.types.TypeEngine[Any]]
 
 
 class ReflectedTypeFacts(NamedTuple):
@@ -47,16 +52,53 @@ class DialectMap[_TypeParameters: str](ABC):
     """
     dialect: ClassVar[DialectTypes]
     dialect_paramaters: ClassVar[frozenset[str]]
-    py_types: ClassVar[dict[str, str]]
+    py_types: ClassVar[dict[str, PyTypeParameters]]
+    sa_types: ClassVar[dict[str, SaTypeFactory]]
+
+    _quote_open: ClassVar[str] = '"'
+    _quote_close: ClassVar[str] = '"'
 
     @classmethod
-    def get_py_type(cls, sql_type: str) -> str:
+    def quote_identifier(cls, name: str) -> str:
+        """Quote a schema/table/column name with the dialect's delimiters,
+        escaping embedded closing delimiters by doubling them."""
+        escaped = name.replace(cls._quote_close, cls._quote_close * 2)
+        return f"{cls._quote_open}{escaped}{cls._quote_close}"
+
+    @classmethod
+    def render_reference(cls, schema_name: str, object_name: str) -> str:
+        """Render the fully-qualified, dialect-quoted object reference,
+        e.g. ``[dbo].[orders]`` or ``"public"."orders"``."""
+        return f"{cls.quote_identifier(schema_name)}.{cls.quote_identifier(object_name)}"
+
+    @classmethod
+    def get_py_type(cls, sql_type: str) -> PyTypeParameters:
         """Map a raw SQL type name to the Python type name for the model."""
         try:
             return cls.py_types[sql_type.lower()]
         except KeyError:
             raise ValueError(
                 f"{cls.__name__}: no Python mapping for SQL type {sql_type!r}"
+            ) from None
+
+    @classmethod
+    def get_sa_type(cls, sql_type: str | None) -> sa.types.TypeEngine[Any]:
+        """Map a raw SQL type name to a SQLAlchemy type instance for Core
+        compilation.
+
+        ``None`` (a column with no recorded type) compiles as ``NullType``,
+        which is valid anywhere a concrete type is not required (it cannot be
+        ``CAST`` to). Types the dialect map deliberately assigns ``NullType``
+        (e.g. spatial types SQLAlchemy has no class for) behave the same way.
+        """
+        if sql_type is None:
+            return sa.types.NullType()
+
+        try:
+            return cls.sa_types[sql_type.lower()]()
+        except KeyError:
+            raise ValueError(
+                f"{cls.__name__}: no SQLAlchemy mapping for SQL type {sql_type!r}"
             ) from None
 
     @classmethod

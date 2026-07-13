@@ -25,6 +25,14 @@ class EngineHandler:
         self._engine = engine
         self._con_info = con_info
 
+    def get_inspector(self) -> sqlalchemy.Inspector:
+        """Return a SQLAlchemy ``Inspector`` bound to this handler's engine."""
+        return sqlalchemy.inspect(self._engine)
+
+    def quote_identifier(self, identifier: str) -> str:
+        """Quote a schema/table/column name using this engine's dialect rules."""
+        return self._engine.dialect.identifier_preparer.quote(identifier)
+
     def run_sql(self, sql: SQL) -> tuple[int | None, pd.DataFrame]:
         """Run any query and return both the affected row count and the result rows.
 
@@ -51,7 +59,7 @@ class EngineHandler:
             A ``(row_count, DataFrame)`` pair. When ``f_check`` returns False
             (rollback) the row count is ``None`` and the DataFrame is empty.
         """
-        if sql.script_dir is None:
+        if sql.script_dir is None and sql.sql_path is not None:
             sql.set_script_dir(self._con_info.get_script_dir())
 
         sql.process_query()

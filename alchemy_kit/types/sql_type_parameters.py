@@ -113,6 +113,10 @@ PostgresqlTypeParameters: TypeAlias = Literal[
     "tsvector", "tsquery",
     # XML / other
     "xml", "oid",
+    # Reflection-emitted names: SQLAlchemy reflects named enum types and array
+    # columns as its generic ENUM/ARRAY classes, so these arrive instead of the
+    # declared SQL name (e.g. "order_status", "integer[]").
+    "enum", "array",
 ]
 
 
@@ -131,6 +135,9 @@ OracleTypeParameters: TypeAlias = Literal[
     "timestamp with local time zone",
     "interval year to month",
     "interval day to second",
+    # Reflection-emitted name: SQLAlchemy reflects both interval flavors as
+    # its INTERVAL class, so "interval" arrives instead of the full SQL name.
+    "interval",
     # Binary / large objects
     "raw", "long raw", "blob", "bfile",
     # Row identifiers

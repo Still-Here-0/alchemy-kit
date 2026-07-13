@@ -20,6 +20,7 @@ class ColumnMetadata:
     collation: str | None              = None
     original_type: str | None          = None
     foreign_key: ForeignKeyMeta | None = None
+    check_constraints: dict[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {}

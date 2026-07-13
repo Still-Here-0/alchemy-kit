@@ -2,13 +2,17 @@ from typing import cast, get_args
 
 from alchemy_kit.types.dialect_types import DialectTypes
 
-from ._base import ColumnLike, DialectMap
+from sqlalchemy.dialects import mysql as sa_mysql
+from sqlalchemy.types import NullType
+
+from ._base import ColumnLike, DialectMap, SaTypeFactory
+from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import MysqlTypeParameters
 
 
 class MysqlMap(DialectMap[MysqlTypeParameters]):
 
-    _PY_TYPES: dict[MysqlTypeParameters, str] = {
+    _PY_TYPES: dict[MysqlTypeParameters, PyTypeParameters] = {
         # Integers
         "tinyint": "int",
         "smallint": "int",
@@ -67,6 +71,65 @@ class MysqlMap(DialectMap[MysqlTypeParameters]):
         "geometrycollection": "Any",
     }
 
+    _SA_TYPES: dict[MysqlTypeParameters, SaTypeFactory] = {
+        # Integers
+        "tinyint": sa_mysql.TINYINT,
+        "smallint": sa_mysql.SMALLINT,
+        "mediumint": sa_mysql.MEDIUMINT,
+        "int": sa_mysql.INTEGER,
+        "integer": sa_mysql.INTEGER,
+        "bigint": sa_mysql.BIGINT,
+        # Boolean
+        "bool": sa_mysql.BOOLEAN,
+        "boolean": sa_mysql.BOOLEAN,
+        # Bit-field
+        "bit": sa_mysql.BIT,
+        # Exact numerics
+        "decimal": sa_mysql.DECIMAL,
+        "dec": sa_mysql.DECIMAL,
+        "numeric": sa_mysql.NUMERIC,
+        "fixed": sa_mysql.DECIMAL,
+        # Approximate numerics
+        "float": sa_mysql.FLOAT,
+        "double": sa_mysql.DOUBLE,
+        "double precision": sa_mysql.DOUBLE,
+        "real": sa_mysql.REAL,
+        # Date / time
+        "date": sa_mysql.DATE,
+        "datetime": sa_mysql.DATETIME,
+        "timestamp": sa_mysql.TIMESTAMP,
+        "time": sa_mysql.TIME,
+        "year": sa_mysql.YEAR,
+        # Character strings
+        "char": sa_mysql.CHAR,
+        "varchar": sa_mysql.VARCHAR,
+        "tinytext": sa_mysql.TINYTEXT,
+        "text": sa_mysql.TEXT,
+        "mediumtext": sa_mysql.MEDIUMTEXT,
+        "longtext": sa_mysql.LONGTEXT,
+        # Enumerated / set
+        "enum": sa_mysql.ENUM,
+        "set": sa_mysql.SET,
+        # Binary strings
+        "binary": sa_mysql.BINARY,
+        "varbinary": sa_mysql.VARBINARY,
+        "tinyblob": sa_mysql.TINYBLOB,
+        "blob": sa_mysql.BLOB,
+        "mediumblob": sa_mysql.MEDIUMBLOB,
+        "longblob": sa_mysql.LONGBLOB,
+        # JSON
+        "json": sa_mysql.JSON,
+        # Spatial
+        "geometry": NullType,
+        "point": NullType,
+        "linestring": NullType,
+        "polygon": NullType,
+        "multipoint": NullType,
+        "multilinestring": NullType,
+        "multipolygon": NullType,
+        "geometrycollection": NullType,
+    }
+
     # SQL type name buckets (MySQL lengths are in characters)
     _length_types_char: set[MysqlTypeParameters] = {"char", "varchar"}
     _length_types_bin: set[MysqlTypeParameters] = {"binary", "varbinary"}
@@ -75,9 +138,12 @@ class MysqlMap(DialectMap[MysqlTypeParameters]):
     _date_types: set[MysqlTypeParameters] = {"datetime", "timestamp", "time"}
 
     # Parent parameters
-    py_types = cast(dict[str, str], _PY_TYPES)
+    py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
+    sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     dialect = DialectTypes.MYSQL
     dialect_paramaters = frozenset(get_args(MysqlTypeParameters))
+    _quote_open = "`"
+    _quote_close = "`"
 
     @classmethod
     def render_type(cls, column: ColumnLike) -> str:
@@ -122,3 +188,5 @@ class MysqlMap(DialectMap[MysqlTypeParameters]):
 # all members are present. This guard closes that gap at import time.
 _missing = set(get_args(MysqlTypeParameters)) - MysqlMap.py_types.keys()
 assert not _missing, f"MysqlMap.py_types is missing SQL types: {sorted(_missing)}"
+_missing = set(get_args(MysqlTypeParameters)) - MysqlMap.sa_types.keys()
+assert not _missing, f"MysqlMap.sa_types is missing SQL types: {sorted(_missing)}"

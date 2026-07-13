@@ -15,6 +15,7 @@ from {parameter_map_module} import {parameter_map}
 from datetime import datetime, date
 from pandera.typing import Series
 from typing import Optional, Any
+import pandas as pd
 import pandera.pandas as pa
 
 class {class_name}(BaseModel[{type_parameters}]):
@@ -22,6 +23,8 @@ class {class_name}(BaseModel[{type_parameters}]):
     _map = {parameter_map}
 
     :columns
+
+    :checks
 
     class Config(BaseModel.Config):
         {unique}

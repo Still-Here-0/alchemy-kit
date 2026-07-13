@@ -2,13 +2,17 @@ from typing import cast, get_args
 
 from alchemy_kit.types.dialect_types import DialectTypes
 
-from ._base import ColumnLike, DialectMap, ReflectedTypeFacts
+from sqlalchemy.dialects import sqlite as sa_sqlite
+from sqlalchemy.types import BIGINT, CLOB, DOUBLE, DOUBLE_PRECISION, NCHAR, NVARCHAR, SMALLINT
+
+from ._base import ColumnLike, DialectMap, ReflectedTypeFacts, SaTypeFactory
+from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import SqliteTypeParameters
 
 
 class SqliteMap(DialectMap[SqliteTypeParameters]):
 
-    _PY_TYPES: dict[SqliteTypeParameters, str] = {
+    _PY_TYPES: dict[SqliteTypeParameters, PyTypeParameters] = {
         # INTEGER affinity
         "int": "int",
         "integer": "int",
@@ -43,6 +47,41 @@ class SqliteMap(DialectMap[SqliteTypeParameters]):
         "blob": "Any",
     }
 
+    _SA_TYPES: dict[SqliteTypeParameters, SaTypeFactory] = {
+        # INTEGER affinity
+        "int": sa_sqlite.INTEGER,
+        "integer": sa_sqlite.INTEGER,
+        "tinyint": SMALLINT,
+        "smallint": sa_sqlite.SMALLINT,
+        "mediumint": sa_sqlite.INTEGER,
+        "bigint": BIGINT,
+        "unsigned big int": BIGINT,
+        "int2": SMALLINT,
+        "int8": BIGINT,
+        # REAL affinity
+        "real": sa_sqlite.REAL,
+        "double": DOUBLE,
+        "double precision": DOUBLE_PRECISION,
+        "float": sa_sqlite.FLOAT,
+        # NUMERIC affinity
+        "numeric": sa_sqlite.NUMERIC,
+        "decimal": sa_sqlite.DECIMAL,
+        "boolean": sa_sqlite.BOOLEAN,
+        "date": sa_sqlite.DATE,
+        "datetime": sa_sqlite.DATETIME,
+        # TEXT affinity
+        "character": sa_sqlite.CHAR,
+        "varchar": sa_sqlite.VARCHAR,
+        "varying character": sa_sqlite.VARCHAR,
+        "nchar": NCHAR,
+        "native character": NCHAR,
+        "nvarchar": NVARCHAR,
+        "text": sa_sqlite.TEXT,
+        "clob": CLOB,
+        # BLOB affinity
+        "blob": sa_sqlite.BLOB,
+    }
+
     # SQL type name buckets (SQLite ignores length constraints, but declared
     # lengths are preserved for rendering and validation)
     _length_types_char: set[SqliteTypeParameters] = {
@@ -52,7 +91,8 @@ class SqliteMap(DialectMap[SqliteTypeParameters]):
     _numerical_parametise: set[SqliteTypeParameters] = {"decimal", "numeric"}
 
     # Parent parameters
-    py_types = cast(dict[str, str], _PY_TYPES)
+    py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
+    sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     dialect = DialectTypes.SQLITE
     dialect_paramaters = frozenset(get_args(SqliteTypeParameters))
 
@@ -97,3 +137,5 @@ class SqliteMap(DialectMap[SqliteTypeParameters]):
 # all members are present. This guard closes that gap at import time.
 _missing = set(get_args(SqliteTypeParameters)) - SqliteMap.py_types.keys()
 assert not _missing, f"SqliteMap.py_types is missing SQL types: {sorted(_missing)}"
+_missing = set(get_args(SqliteTypeParameters)) - SqliteMap.sa_types.keys()
+assert not _missing, f"SqliteMap.sa_types is missing SQL types: {sorted(_missing)}"

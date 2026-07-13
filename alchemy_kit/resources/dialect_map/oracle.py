@@ -2,13 +2,17 @@ from typing import cast, get_args
 
 from alchemy_kit.types.dialect_types import DialectTypes
 
-from ._base import ColumnLike, DialectMap
+from sqlalchemy.dialects import oracle as sa_oracle
+from sqlalchemy.types import INTEGER, NullType, SMALLINT
+
+from ._base import ColumnLike, DialectMap, SaTypeFactory
+from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import OracleTypeParameters
 
 
 class OracleMap(DialectMap[OracleTypeParameters]):
 
-    _PY_TYPES: dict[OracleTypeParameters, str] = {
+    _PY_TYPES: dict[OracleTypeParameters, PyTypeParameters] = {
         # Numerics (Decimal is not imported by the template, so use float)
         "number": "float",
         "float": "float",
@@ -37,6 +41,7 @@ class OracleMap(DialectMap[OracleTypeParameters]):
         "timestamp with local time zone": "datetime",
         "interval year to month": "Any",
         "interval day to second": "Any",
+        "interval": "Any",
         # Binary / large objects
         "raw": "Any",
         "long raw": "Any",
@@ -47,6 +52,48 @@ class OracleMap(DialectMap[OracleTypeParameters]):
         "urowid": "str",
         # XML
         "xmltype": "str",
+    }
+
+    _SA_TYPES: dict[OracleTypeParameters, SaTypeFactory] = {
+        # Numerics
+        "number": sa_oracle.NUMBER,
+        "float": sa_oracle.FLOAT,
+        "binary_float": sa_oracle.BINARY_FLOAT,
+        "binary_double": sa_oracle.BINARY_DOUBLE,
+        "integer": INTEGER,
+        "int": INTEGER,
+        "smallint": SMALLINT,
+        "dec": sa_oracle.NUMBER,
+        "decimal": sa_oracle.NUMBER,
+        "numeric": sa_oracle.NUMBER,
+        # Character strings
+        "char": sa_oracle.CHAR,
+        "nchar": sa_oracle.NCHAR,
+        "varchar": sa_oracle.VARCHAR,
+        "varchar2": sa_oracle.VARCHAR2,
+        "nvarchar2": sa_oracle.NVARCHAR2,
+        "long": sa_oracle.LONG,
+        # Large objects (character)
+        "clob": sa_oracle.CLOB,
+        "nclob": sa_oracle.NCLOB,
+        # Date / time
+        "date": sa_oracle.DATE,
+        "timestamp": sa_oracle.TIMESTAMP,
+        "timestamp with time zone": lambda: sa_oracle.TIMESTAMP(timezone=True),
+        "timestamp with local time zone": lambda: sa_oracle.TIMESTAMP(local_timezone=True),
+        "interval year to month": NullType,
+        "interval day to second": sa_oracle.INTERVAL,
+        "interval": sa_oracle.INTERVAL,
+        # Binary / large objects
+        "raw": sa_oracle.RAW,
+        "long raw": NullType,
+        "blob": sa_oracle.BLOB,
+        "bfile": sa_oracle.BFILE,
+        # Row identifiers
+        "rowid": sa_oracle.ROWID,
+        "urowid": sa_oracle.ROWID,
+        # XML
+        "xmltype": NullType,
     }
 
     # SQL type name buckets (Oracle lengths reported in characters/bytes as-is)
@@ -63,7 +110,8 @@ class OracleMap(DialectMap[OracleTypeParameters]):
     }
 
     # Parent parameters
-    py_types = cast(dict[str, str], _PY_TYPES)
+    py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
+    sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     dialect = DialectTypes.ORACLE
     dialect_paramaters = frozenset(get_args(OracleTypeParameters))
 
@@ -113,3 +161,5 @@ class OracleMap(DialectMap[OracleTypeParameters]):
 # all members are present. This guard closes that gap at import time.
 _missing = set(get_args(OracleTypeParameters)) - OracleMap.py_types.keys()
 assert not _missing, f"OracleMap.py_types is missing SQL types: {sorted(_missing)}"
+_missing = set(get_args(OracleTypeParameters)) - OracleMap.sa_types.keys()
+assert not _missing, f"OracleMap.sa_types is missing SQL types: {sorted(_missing)}"

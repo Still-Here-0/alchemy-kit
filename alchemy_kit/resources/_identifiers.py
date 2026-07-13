@@ -25,7 +25,7 @@ class Identifiers:
             "Series", "datetime",
 
             # object unit
-            "get_metadata", "set_alias", "get_reference"
+            "get_metadata", "set_alias"
         }
     )
 
@@ -107,7 +107,7 @@ class Identifiers:
         """Return ``possible_name`` (or a numbered variant) not already used,
         then register the chosen name."""
         name = possible_name
-        suffix = 1
+        suffix = 0
         while name in self._used:
             suffix += 1
             name = f"{possible_name}_{suffix}"

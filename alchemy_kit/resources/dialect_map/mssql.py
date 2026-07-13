@@ -2,13 +2,16 @@ from typing import cast, get_args
 
 from alchemy_kit.types.dialect_types import DialectTypes
 
-from ._base import ColumnLike, DialectMap, ReflectedTypeFacts
+from sqlalchemy.dialects import mssql as sa_mssql
+
+from ._base import ColumnLike, DialectMap, ReflectedTypeFacts, SaTypeFactory
+from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import MssqlTypeParameters
 
 
 class MssqlMap(DialectMap[MssqlTypeParameters]):
 
-    _PY_TYPES: dict[MssqlTypeParameters, str] = {
+    _PY_TYPES: dict[MssqlTypeParameters, PyTypeParameters] = {
         # Integers
         "bigint": "int",
         "int": "int",
@@ -50,6 +53,48 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
         "sql_variant": "Any",
     }
 
+    _SA_TYPES: dict[MssqlTypeParameters, SaTypeFactory] = {
+        # Integers
+        "bigint": sa_mssql.BIGINT,
+        "int": sa_mssql.INTEGER,
+        "smallint": sa_mssql.SMALLINT,
+        "tinyint": sa_mssql.TINYINT,
+        # Boolean
+        "bit": sa_mssql.BIT,
+        # Exact numerics
+        "decimal": sa_mssql.DECIMAL,
+        "numeric": sa_mssql.NUMERIC,
+        "money": sa_mssql.MONEY,
+        "smallmoney": sa_mssql.SMALLMONEY,
+        # Approximate numerics
+        "float": sa_mssql.FLOAT,
+        "real": sa_mssql.REAL,
+        # Date / time
+        "date": sa_mssql.DATE,
+        "datetime": sa_mssql.DATETIME,
+        "datetime2": sa_mssql.DATETIME2,
+        "smalldatetime": sa_mssql.SMALLDATETIME,
+        "datetimeoffset": sa_mssql.DATETIMEOFFSET,
+        "time": sa_mssql.TIME,
+        # Character strings
+        "char": sa_mssql.CHAR,
+        "varchar": sa_mssql.VARCHAR,
+        "nchar": sa_mssql.NCHAR,
+        "nvarchar": sa_mssql.NVARCHAR,
+        "text": sa_mssql.TEXT,
+        "ntext": sa_mssql.NTEXT,
+        "xml": sa_mssql.XML,
+        "sysname": sa_mssql.NVARCHAR,
+        "uniqueidentifier": sa_mssql.UNIQUEIDENTIFIER,
+        # Binary / other
+        "binary": sa_mssql.BINARY,
+        "varbinary": sa_mssql.VARBINARY,
+        "image": sa_mssql.IMAGE,
+        "timestamp": sa_mssql.TIMESTAMP,
+        "rowversion": sa_mssql.ROWVERSION,
+        "sql_variant": sa_mssql.SQL_VARIANT,
+    }
+
     # SQL type name buckets
     _length_types_char: set[MssqlTypeParameters] = {"char", "varchar"}        # 1 byte/char
     _length_types_nchar: set[MssqlTypeParameters] = {"nchar", "nvarchar"}     # 2 bytes/char (Unicode)
@@ -59,9 +104,12 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
     _date_types: set[MssqlTypeParameters] = {"time", "datetime2", "datetimeoffset"}
 
     # Parent parameters
-    py_types = cast(dict[str, str], _PY_TYPES)
+    py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
+    sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     dialect = DialectTypes.MSSQL
     dialect_paramaters = frozenset(get_args(MssqlTypeParameters))
+    _quote_open = "["
+    _quote_close = "]"
 
     @classmethod
     def reflected_type_facts(cls, sa_type: object) -> ReflectedTypeFacts:
@@ -123,3 +171,5 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
 # all members are present. This guard closes that gap at import time.
 _missing = set(get_args(MssqlTypeParameters)) - MssqlMap.py_types.keys()
 assert not _missing, f"MssqlMap.py_types is missing SQL types: {sorted(_missing)}"
+_missing = set(get_args(MssqlTypeParameters)) - MssqlMap.sa_types.keys()
+assert not _missing, f"MssqlMap.sa_types is missing SQL types: {sorted(_missing)}"

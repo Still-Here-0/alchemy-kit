@@ -7,8 +7,7 @@ from ...types import DialectTypes, sql_type_parameters
 from .._model.column_model import ColumnModel
 from .._model.object_model import ObjectModel
 from ..base_model import BaseModel
-from ..units.column_unit import ColumnUnit
-from ..units.object_unit import ObjectUnit
+from .. import units
 
 
 @dataclass(kw_only=True)
@@ -28,8 +27,8 @@ class StubFileBuilder:
         template = self.template.read_text("UTF-8").format(
             class_name=self.class_name,
             base_model_module=BaseModel.__module__,
-            object_unit_module=ObjectUnit.__module__,
-            column_unit_module=ColumnUnit.__module__,
+            object_unit_module=units.__name__,
+            column_unit_module=units.__name__,
             type_parameters_module=sql_type_parameters.__name__,
             type_parameters=type_parameters,
         )
