@@ -34,54 +34,62 @@ class EngineHandler:
         return self._engine.dialect.identifier_preparer.quote(identifier)
 
     def run_sql(self, sql: SQL) -> tuple[int | None, pd.DataFrame]:
-        """Run any query and return both the affected row count and the result rows.
+        """Run one statement on its own connection and return its
+        ``(row_count, DataFrame)`` pair; ``f_check`` gates commit vs
+        rollback (``(None, empty)`` on rollback)."""
+        with self._engine.connect() as conn:
+            result = self._execute_sql(conn, sql)
 
-        If the ``SQL`` has no ``script_dir`` of its own, it is assigned this
-        connection's script directory (resolved via ``ConnectionInfo.get_script_dir``)
-        so that file-based queries resolve against the caller's project; a
-        ``script_dir`` already set on the ``SQL`` is left untouched.
+            if not sql.f_check(conn):
+                conn.rollback()
+                return None, pd.DataFrame()
 
-        Processes the ``SQL`` (loading from file or raw text, converting
-        ``@param`` placeholders to ``:param`` and applying text replacements),
-        then executes it on a fresh connection. When ``query_parameters`` is a
-        sequence it is passed straight through (executemany-style); otherwise
-        each parameter is bound individually, expanding ``SqlExpandType`` values
-        into ``IN`` lists.
+            row_count, data = self._collect_result(result)
+            conn.commit()
+            return row_count, data
 
-        The statement runs inside a transaction gated by ``sql.f_check``: when
-        it returns True the transaction commits, otherwise it rolls back. On
-        commit the row count is captured and, for row-returning statements
-        (SELECT, OUTPUT, SELECT SCOPE_IDENTITY(), ...), the rows are loaded into
-        the DataFrame; non-row-returning statements (UPDATE, DELETE, TRUNCATE,
-        ...) yield an empty DataFrame.
+    def run_sqls(self, sqls: Sequence[SQL]) -> list[tuple[int | None, pd.DataFrame]]:
+        """Run statements in order on one connection, in a single
+        all-or-nothing transaction, returning one ``(row_count, DataFrame)``
+        pair per statement.
 
-        Returns:
-            A ``(row_count, DataFrame)`` pair. When ``f_check`` returns False
-            (rollback) the row count is ``None`` and the DataFrame is empty.
+        The shared connection keeps session state (e.g. temporary tables)
+        alive across statements; the first failing ``f_check`` rolls back
+        everything.
         """
+        results: list[tuple[int | None, pd.DataFrame]] = []
+
+        with self._engine.connect() as conn:
+            for sql in sqls:
+                result = self._execute_sql(conn, sql)
+
+                if not sql.f_check(conn):
+                    conn.rollback()
+                    return [(None, pd.DataFrame()) for _ in range(len(results) + 1)]
+
+                results.append(self._collect_result(result))
+
+            conn.commit()
+
+        return results
+
+    def _execute_sql(self, conn: sqlalchemy.Connection, sql: SQL) -> sqlalchemy.CursorResult:
         if sql.script_dir is None and sql.sql_path is not None:
             sql.set_script_dir(self._con_info.get_script_dir())
 
         sql.process_query()
         query = sqlalchemy.text(cast(str, sql.processed_query))
-        row_count = None
+
+        if isinstance(sql.query_parameters, Sequence):
+            return conn.execute(query, sql.query_parameters)
+        return self._execute_with_binded_parameters(conn, query, sql.query_parameters)
+
+    @staticmethod
+    def _collect_result(result: sqlalchemy.CursorResult) -> tuple[int | None, pd.DataFrame]:
         data = pd.DataFrame()
-
-        with self._engine.connect() as conn:
-            if isinstance(sql.query_parameters, Sequence):
-                result = conn.execute(query, sql.query_parameters)
-            else:
-                result = self._execute_with_binded_parameters(conn, query, sql.query_parameters)
-
-            if sql.f_check(conn):
-                row_count = result.rowcount
-                if result.returns_rows:
-                    data = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
-                conn.commit()
-            else:
-                conn.rollback()
-
-            return row_count, data
+        if result.returns_rows:
+            data = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
+        return result.rowcount, data
 
     def _execute_with_binded_parameters(self, conn: sqlalchemy.Connection, query: sqlalchemy.TextClause, parameters: SqlParamMap) -> sqlalchemy.CursorResult:
         binds = [
@@ -103,11 +111,18 @@ class EngineHandler:
         truncate: bool = False,
         if_exists: Literal["fail", "replace", "append", "delete_rows"] = "append"
     ) -> int | None:
+        """Bulk-insert a DataFrame into ``database.schema.table`` with pandas
+        ``to_sql`` (``if_exists`` passed through, index never inserted) and
+        return the inserted row count.
+
+        ``truncate`` empties the table first, in the same transaction as the
+        insert.
+        """
         table_ref = f"{database_name}.{schema_name}.{table_name}"
 
-        with self._engine.connect() as conn:
+        with self._engine.begin() as conn:
             if truncate:
                 conn.execute(sqlalchemy.text(f"TRUNCATE TABLE {table_ref}"))
 
-            return data.to_sql(table_name, conn, schema=schema_name, if_exists=if_exists)
+            return data.to_sql(table_name, conn, schema=schema_name, if_exists=if_exists, index=False)
 
