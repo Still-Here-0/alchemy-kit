@@ -6,14 +6,26 @@ import sqlalchemy
 from dotenv import dotenv_values
 from pydantic import SecretStr
 
-from ..types.dialect_types import DialectTypes
-from ..types.generic_path import GenericPath
+from ..resources._settings import Settings
+from ..types import _driver_types
 from ..types.api_types import SqlServerApi
 from ..types.auth_types import AuthType
-from ..types import _driver_types
+from ..types.dialect_types import DialectTypes
+from ..types.generic_path import GenericPath
 from ._conn_builders import mssql
+from ._drivers import require_driver
 from ._info import ConnectionInfo
-from ..resources._settings import Settings
+
+__all__ = [
+    "from_json",
+    "from_env",
+    "from_values_mssql",
+    "from_values_mysql",
+    "from_values_postgresql",
+    "from_values_mariadb",
+    "from_values_sqlite",
+    "from_values_oracle",
+]
 
 def from_json(json_path: GenericPath) -> list[ConnectionInfo]:
     """Build a list of connections from a JSON file.
@@ -136,22 +148,6 @@ def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: d
         case DialectTypes.ORACLE:
             return from_values_oracle()
 
-def from_url(sql_url: sqlalchemy.URL, unique_id: Optional[str] = None) -> ConnectionInfo:
-    """Build a connection directly from a SQLAlchemy URL.
-
-    Use this when you already have a fully formed ``sqlalchemy.URL`` and want to
-    bypass the dialect-specific builders.
-
-    Args:
-        sql_url: The SQLAlchemy URL to connect with.
-        unique_id: Optional identifier for the connection; a random one is
-            generated when ``None``.
-
-    Returns:
-        A ``ConnectionInfo`` wrapping the given URL.
-    """
-    return ConnectionInfo(sql_url, unique_id)
-
 @overload
 def from_values_mssql(
     auth_type: Literal[AuthType.MICROSOFT_AUTH],
@@ -209,7 +205,10 @@ def from_values_mssql(
     Raises:
         ValueError: If ``SQL_AUTH`` is chosen without ``user_name`` and
             ``user_pwd``.
+        ImportError: If the DBAPI driver behind ``api`` is not installed.
     """
+    require_driver(api, "mssql")
+
     conn_url: sqlalchemy.URL
     match auth_type:
         case AuthType.SQL_AUTH:
