@@ -1,0 +1,135 @@
+from typing import Any
+
+import sqlalchemy as sa
+from sqlalchemy.sql.expression import ColumnElement, FromClause, Join, Select
+
+from ..model.units import BooleanColumnUnit, ColumnUnit, ObjectUnit
+from ..types.sql_types import SqlJoinTypes
+from ._base import SqlBuilder
+
+_JOIN_FLAGS: dict[SqlJoinTypes, dict[str, bool]] = {
+    "INNER": {},
+    "LEFT": {"isouter": True},
+    "FULL": {"isouter": True, "full": True},
+}
+
+
+class SelectBuilder(SqlBuilder):
+    """Builds a ``SELECT`` statement from column and/or object units; the
+    dialect comes from the first unit's model and every fluent method
+    returns a new builder."""
+
+    def __init__(self, *columns: "ColumnUnit[Any] | ObjectUnit[Any]") -> None:
+        if not columns:
+            raise ValueError("SelectBuilder needs at least one column or object unit")
+
+        super().__init__(columns[0]._base)
+        self._stmt: Select[Any] = sa.select(*(self._selected(c) for c in columns))
+        self._from: FromClause | None = None
+
+    @staticmethod
+    def _selected(column: "ColumnUnit[Any] | ObjectUnit[Any]") -> Any:
+        if isinstance(column, ObjectUnit):
+            return column._selectable
+        return column._element
+
+    @staticmethod
+    def _condition_element(condition: BooleanColumnUnit[Any]) -> ColumnElement[bool]:
+        return condition._element
+
+    @staticmethod
+    def _column_element(column: ColumnUnit[Any]) -> ColumnElement[Any]:
+        return column._element
+
+    @staticmethod
+    def _required_condition(
+        how: SqlJoinTypes, on: "BooleanColumnUnit[Any] | None"
+    ) -> ColumnElement[bool]:
+        if on is None:
+            raise TypeError(f"{how} join requires an on condition")
+        return SelectBuilder._condition_element(on)
+
+    def _with(
+        self, stmt: Select[Any], joined: FromClause | None = None
+    ) -> "SelectBuilder":
+        clone = SelectBuilder.__new__(SelectBuilder)
+        SqlBuilder.__init__(clone, self._base)
+        clone._stmt = stmt
+        clone._from = joined if joined is not None else self._from
+        return clone
+
+    def _statement(self) -> Select[Any]:
+        if self._from is None:
+            return self._stmt
+        return self._stmt.select_from(self._from)
+
+    def where(self, *conditions: BooleanColumnUnit[Any]) -> "SelectBuilder":
+        """Add ``WHERE`` conditions (multiple conditions are ``AND``-ed)."""
+        return self._with(
+            self._stmt.where(*(self._condition_element(c) for c in conditions))
+        )
+
+    def join(
+        self,
+        how: SqlJoinTypes,
+        other: ObjectUnit[Any],
+        on: BooleanColumnUnit[Any] | None = None,
+    ) -> "SelectBuilder":
+        """Add a join to ``other``; ``CROSS`` takes no ``on`` condition and
+        ``RIGHT`` compiles as the equivalent operand-flipped ``LEFT OUTER
+        JOIN``."""
+        left = self._from if self._from is not None else self._stmt.get_final_froms()[0]
+
+        joined: Join
+        match how:
+            case "CROSS":
+                if on is not None:
+                    raise TypeError("CROSS join takes no on condition")
+                joined = sa.join(left, other._selectable, sa.true())
+            case "RIGHT":
+                joined = sa.outerjoin(
+                    other._selectable, left, self._required_condition(how, on)
+                )
+            case _:
+                joined = sa.join(
+                    left,
+                    other._selectable,
+                    self._required_condition(how, on),
+                    **_JOIN_FLAGS[how],
+                )
+
+        return self._with(self._stmt, joined)
+
+    def group_by(self, *columns: ColumnUnit[Any]) -> "SelectBuilder":
+        """Add ``GROUP BY`` expressions."""
+        return self._with(
+            self._stmt.group_by(*(self._column_element(c) for c in columns))
+        )
+
+    def having(self, *conditions: BooleanColumnUnit[Any]) -> "SelectBuilder":
+        """Add ``HAVING`` conditions (multiple conditions are ``AND``-ed)."""
+        return self._with(
+            self._stmt.having(*(self._condition_element(c) for c in conditions))
+        )
+
+    def order_by(self, *columns: ColumnUnit[Any]) -> "SelectBuilder":
+        """Add ``ORDER BY`` expressions (direction via the column's
+        ``asc()``/``desc()``)."""
+        return self._with(
+            self._stmt.order_by(*(self._column_element(c) for c in columns))
+        )
+
+    def distinct(self) -> "SelectBuilder":
+        """Deduplicate the result rows (``SELECT DISTINCT``)."""
+        return self._with(self._stmt.distinct())
+
+    def limit(self, count: int) -> "SelectBuilder":
+        """Cap the number of returned rows; the dialect decides the rendering
+        (``TOP``/``LIMIT``/``FETCH NEXT``)."""
+        return self._with(self._stmt.limit(count))
+
+    def offset(self, count: int) -> "SelectBuilder":
+        """Skip the first ``count`` rows (usually paired with ``limit`` and
+        an ``order_by``)."""
+        return self._with(self._stmt.offset(count))
+

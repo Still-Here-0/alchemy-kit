@@ -34,24 +34,6 @@ SqlExpandType: TypeAlias = list | set | tuple
 
 SqlParamType: TypeAlias = SqlScalarType | SqlExpandType
 
-SqlOrderTypes: TypeAlias = Literal["DESC", "ASC"]
-
-SqlBooleanOperations: TypeAlias = Literal[
-    "=",
-    "!=",
-    "<>",
-    ">",
-    "<",
-    ">=",
-    "<=",
-    "LIKE",
-    "IS",
-    "IN",
-    "NOT LIKE",
-    "IS NOT",
-    "NOT IN",
-]
-
 SqlJoinTypes: TypeAlias = Literal[
     "INNER",
     "LEFT",
