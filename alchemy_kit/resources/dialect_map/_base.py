@@ -54,6 +54,7 @@ class DialectMap[_TypeParameters: str](ABC):
     dialect_paramaters: ClassVar[frozenset[str]]
     py_types: ClassVar[dict[str, PyTypeParameters]]
     sa_types: ClassVar[dict[str, SaTypeFactory]]
+    _reflected_synonyms: ClassVar[dict[str, str]] = {}
 
     _quote_open: ClassVar[str] = '"'
     _quote_close: ClassVar[str] = '"'
@@ -108,9 +109,13 @@ class DialectMap[_TypeParameters: str](ABC):
 
         The type name is the lowercased class name, which for dialect-specific
         reflected types matches the dialect's SQL type name (``NVARCHAR`` ->
-        ``nvarchar``). A string type whose ``length`` is ``None`` is unbounded
-        and reported as ``-1``; parameters a type does not carry are ``0``.
-        Dialects with different conventions override this.
+        ``nvarchar``). Dialects sometimes reflect a SQL type as a class whose
+        name differs from the type's own name (MSSQL ``int`` ->
+        ``sqltypes.INTEGER``); ``_reflected_synonyms`` maps those class names
+        back to the dialect's canonical type name. A string type whose
+        ``length`` is ``None`` is unbounded and reported as ``-1``; parameters
+        a type does not carry are ``0``. Dialects with different conventions
+        override this.
         """
         length = getattr(sa_type, "length", None)
         if hasattr(sa_type, "length") and length is None:
@@ -118,8 +123,9 @@ class DialectMap[_TypeParameters: str](ABC):
         else:
             max_length = length or 0
 
+        sql_type = type(sa_type).__name__.lower()
         return ReflectedTypeFacts(
-            sql_type=type(sa_type).__name__.lower(),
+            sql_type=cls._reflected_synonyms.get(sql_type, sql_type),
             max_length=max_length,
             precision=getattr(sa_type, "precision", None) or 0,
             scale=getattr(sa_type, "scale", None) or 0,

@@ -82,6 +82,13 @@ class SqliteMap(DialectMap[SqliteTypeParameters]):
         "blob": sa_sqlite.BLOB,
     }
 
+    # Reflected class name -> dialect type name (a declared CHAR reflects as
+    # the generic CHAR class; TIMESTAMP behaves as datetime)
+    _REFLECTED_SYNONYMS: dict[str, SqliteTypeParameters] = {
+        "char": "character",
+        "timestamp": "datetime",
+    }
+
     # SQL type name buckets (SQLite ignores length constraints, but declared
     # lengths are preserved for rendering and validation)
     _length_types_char: set[SqliteTypeParameters] = {
@@ -93,6 +100,7 @@ class SqliteMap(DialectMap[SqliteTypeParameters]):
     # Parent parameters
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
+    _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
     dialect = DialectTypes.SQLITE
     dialect_paramaters = frozenset(get_args(SqliteTypeParameters))
 

@@ -190,6 +190,14 @@ class PostgresqlMap(DialectMap[PostgresqlTypeParameters]):
         "array": NullType,
     }
 
+    # Reflected class name -> dialect type name (catalog types '"char"' and
+    # 'name' reflect as the generic sqltypes.String; FLOAT is stored as
+    # double precision)
+    _REFLECTED_SYNONYMS: dict[str, PostgresqlTypeParameters] = {
+        "string": "text",
+        "float": "double precision",
+    }
+
     # SQL type name buckets (PostgreSQL lengths are in characters)
     _length_types_char: set[PostgresqlTypeParameters] = {
         "character", "char", "character varying", "varchar", "bpchar",
@@ -204,6 +212,7 @@ class PostgresqlMap(DialectMap[PostgresqlTypeParameters]):
     # Parent parameters
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
+    _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
     dialect = DialectTypes.POSTGRESQL
     dialect_paramaters = frozenset(get_args(PostgresqlTypeParameters))
 

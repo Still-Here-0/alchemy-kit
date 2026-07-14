@@ -96,6 +96,14 @@ class OracleMap(DialectMap[OracleTypeParameters]):
         "xmltype": NullType,
     }
 
+    # Reflected class name -> dialect type name (NVARCHAR2 reflects as the
+    # generic NVARCHAR class; REAL and DOUBLE PRECISION are FLOAT aliases)
+    _REFLECTED_SYNONYMS: dict[str, OracleTypeParameters] = {
+        "nvarchar": "nvarchar2",
+        "real": "float",
+        "double_precision": "float",
+    }
+
     # SQL type name buckets (Oracle lengths reported in characters/bytes as-is)
     _length_types_char: set[OracleTypeParameters] = {
         "char", "nchar", "varchar", "varchar2", "nvarchar2",
@@ -112,6 +120,7 @@ class OracleMap(DialectMap[OracleTypeParameters]):
     # Parent parameters
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
+    _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
     dialect = DialectTypes.ORACLE
     dialect_paramaters = frozenset(get_args(OracleTypeParameters))
 

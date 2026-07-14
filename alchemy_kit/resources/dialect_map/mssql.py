@@ -95,6 +95,13 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
         "sql_variant": sa_mssql.SQL_VARIANT,
     }
 
+    # Reflected class name -> dialect type name ("int" reflects as
+    # sqltypes.INTEGER; "double precision" is an alias of float(53))
+    _REFLECTED_SYNONYMS: dict[str, MssqlTypeParameters] = {
+        "integer": "int",
+        "double_precision": "float",
+    }
+
     # SQL type name buckets
     _length_types_char: set[MssqlTypeParameters] = {"char", "varchar"}        # 1 byte/char
     _length_types_nchar: set[MssqlTypeParameters] = {"nchar", "nvarchar"}     # 2 bytes/char (Unicode)
@@ -106,6 +113,7 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
     # Parent parameters
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
+    _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
     dialect = DialectTypes.MSSQL
     dialect_paramaters = frozenset(get_args(MssqlTypeParameters))
     _quote_open = "["

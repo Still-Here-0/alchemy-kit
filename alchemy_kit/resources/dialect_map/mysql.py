@@ -130,6 +130,13 @@ class MysqlMap(DialectMap[MysqlTypeParameters]):
         "geometrycollection": NullType,
     }
 
+    # Reflected class name -> dialect type name (NCHAR/NVARCHAR are national
+    # charset variants MySQL stores as char/varchar)
+    _REFLECTED_SYNONYMS: dict[str, MysqlTypeParameters] = {
+        "nchar": "char",
+        "nvarchar": "varchar",
+    }
+
     # SQL type name buckets (MySQL lengths are in characters)
     _length_types_char: set[MysqlTypeParameters] = {"char", "varchar"}
     _length_types_bin: set[MysqlTypeParameters] = {"binary", "varbinary"}
@@ -140,6 +147,7 @@ class MysqlMap(DialectMap[MysqlTypeParameters]):
     # Parent parameters
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
+    _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
     dialect = DialectTypes.MYSQL
     dialect_paramaters = frozenset(get_args(MysqlTypeParameters))
     _quote_open = "`"

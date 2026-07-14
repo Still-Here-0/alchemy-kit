@@ -140,6 +140,13 @@ class MariadbMap(DialectMap[MariadbTypeParameters]):
         "geometrycollection": NullType,
     }
 
+    # Reflected class name -> dialect type name (NCHAR/NVARCHAR are national
+    # charset variants MariaDB stores as char/varchar)
+    _REFLECTED_SYNONYMS: dict[str, MariadbTypeParameters] = {
+        "nchar": "char",
+        "nvarchar": "varchar",
+    }
+
     # SQL type name buckets (MariaDB lengths are in characters)
     _length_types_char: set[MariadbTypeParameters] = {"char", "varchar"}
     _length_types_bin: set[MariadbTypeParameters] = {"binary", "varbinary"}
@@ -150,6 +157,7 @@ class MariadbMap(DialectMap[MariadbTypeParameters]):
     # Parent parameters
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
+    _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
     dialect = DialectTypes.MARIADB
     dialect_paramaters = frozenset(get_args(MariadbTypeParameters))
     _quote_open = "`"
