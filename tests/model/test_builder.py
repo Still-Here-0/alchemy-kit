@@ -5,17 +5,20 @@ from typing import cast
 import pytest
 
 from alchemy_kit.connect._info import ConnectionInfo
+from alchemy_kit.connect import info_builder
 from alchemy_kit.model import build
 from alchemy_kit.model import _builder
 from alchemy_kit.model._model.column_model import ColumnModel, ForeignKeyModel
 from alchemy_kit.model._model.constraint_model import CheckConstraintModel, FilteredUniqueIndexModel
+from alchemy_kit.model import SchemaConfig
 from alchemy_kit.model._model.db_model import DBModel
 from alchemy_kit.model._model.object_model import ObjectModel
 from alchemy_kit.model._model.schema_model import SchemaModel
 from alchemy_kit.types.dialect_types import DialectTypes
 
 
-PREVIEW_DIR = Path(__file__).resolve().parent.parent / "secret_model_preview"
+ROOT = Path(__file__).resolve().parent.parent
+PREVIEW_DIR = ROOT / "secret_model_preview"
 
 def _column(name: str, column_type: str, *, nullable: bool = False, fk_ref: ForeignKeyModel | None = None) -> ColumnModel:
     return ColumnModel(
@@ -116,4 +119,10 @@ def test_build_generates_package(monkeypatch: pytest.MonkeyPatch):
 
     for path in result_dir.rglob("*.py*"):
         compile(path.read_text(), str(path), "exec")
+
+def test_mssql_local_build():
+    conn = info_builder.from_env(ROOT/".env-mssql")
+    config = SchemaConfig()
+    config.include_schema("uploader")
+    build(conn, ROOT/"secret_local_mssql", schema_config=config, clear_result_dir=True)
 
