@@ -1,8 +1,22 @@
+from typing import Optional
+
 from pydantic import SecretStr
 import sqlalchemy
 
 from ...types import _driver_types
 from ...types.api_types import SqlServerApi
+
+
+def _tls_query(
+    encrypt: Optional[bool],
+    trust_server_certificate: Optional[bool],
+) -> dict[str, str]:
+    query: dict[str, str] = {}
+    if encrypt is not None:
+        query["Encrypt"] = "yes" if encrypt else "no"
+    if trust_server_certificate is not None:
+        query["TrustServerCertificate"] = "yes" if trust_server_certificate else "no"
+    return query
 
 
 def sql_auth(
@@ -12,6 +26,8 @@ def sql_auth(
     user_name: str,
     user_pwd: SecretStr,
     api: SqlServerApi,
+    encrypt: Optional[bool] = None,
+    trust_server_certificate: Optional[bool] = None,
 ) -> sqlalchemy.URL:
 
     if isinstance(driver, _driver_types.SqlServerODBC):
@@ -25,6 +41,7 @@ def sql_auth(
                 "driver": driver,
                 "ApplicationIntent": "ReadWrite",
                 "MultiSubnetFailover": "yes",
+                **_tls_query(encrypt, trust_server_certificate),
             }
         )
 
@@ -37,6 +54,7 @@ def sql_auth(
             database=database,
             query={
                 "driver": driver,
+                **_tls_query(encrypt, trust_server_certificate),
             }
         )
 
@@ -46,6 +64,8 @@ def microsoft_auth(
     server: str,
     database: str,
     api: SqlServerApi,
+    encrypt: Optional[bool] = None,
+    trust_server_certificate: Optional[bool] = None,
 ) -> sqlalchemy.URL:
     return sqlalchemy.URL.create(
         drivername=f"mssql+{api}",
@@ -56,5 +76,6 @@ def microsoft_auth(
             "Trusted_Connection": "yes",
             "ApplicationIntent": "ReadWrite",
             "MultiSubnetFailover": "yes",
+            **_tls_query(encrypt, trust_server_certificate),
         }
     )

@@ -84,6 +84,20 @@ def from_env(env_path: GenericPath) -> ConnectionInfo:
 
     return _match_dialect(dialect, env_data.get(Settings.FileExtraction.unique_id_marker), env_data)
 
+_TRUE_VALUES = {"yes", "true", "1", "on"}
+_FALSE_VALUES = {"no", "false", "0", "off"}
+
+def _parse_optional_bool(value: Optional[str]) -> Optional[bool]:
+    """Parse a connection-file flag into a tri-state bool (``None`` when unset)."""
+    if value is None or value == "":
+        return None
+    normalized = value.strip().lower()
+    if normalized in _TRUE_VALUES:
+        return True
+    if normalized in _FALSE_VALUES:
+        return False
+    raise ValueError(f"Expected a boolean-like value, got {value!r}")
+
 def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: dict[str, str]) -> ConnectionInfo: # CONTINUE
     """Dispatch a parsed connection definition to the right dialect builder.
 
@@ -109,6 +123,10 @@ def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: d
         case DialectTypes.MSSQL:
             driver = _driver_types.parse_sql_server_driver(conn_data[Settings.FileExtraction.driver_marker])
             api = SqlServerApi(conn_data.get(Settings.FileExtraction.api_marker, SqlServerApi.PYODBC))
+            encrypt = _parse_optional_bool(conn_data.get(Settings.FileExtraction.encrypt_marker))
+            trust_server_certificate = _parse_optional_bool(
+                conn_data.get(Settings.FileExtraction.trust_server_certificate_marker)
+            )
 
             if auth == AuthType.SQL_AUTH:
                 return from_values_mssql(
@@ -119,7 +137,9 @@ def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: d
                     user_name=conn_data[Settings.FileExtraction.user_name_marker],
                     user_pwd=SecretStr(conn_data[Settings.FileExtraction.user_pwd_marker]),
                     unique_id=unique_id,
-                    api=cast(SqlServerApi, api)
+                    api=cast(SqlServerApi, api),
+                    encrypt=encrypt,
+                    trust_server_certificate=trust_server_certificate,
                 )
             elif auth == AuthType.MICROSOFT_AUTH:
                 return from_values_mssql(
@@ -128,7 +148,9 @@ def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: d
                     conn_data[Settings.FileExtraction.server_marker],
                     conn_data[Settings.FileExtraction.database_marker],
                     unique_id=unique_id,
-                    api=api
+                    api=api,
+                    encrypt=encrypt,
+                    trust_server_certificate=trust_server_certificate,
                 )
             else:
                 raise ValueError(f"'{auth}' is not a supported authentication method")
@@ -157,6 +179,8 @@ def from_values_mssql(
     *,
     unique_id: Optional[str] = None,
     api: SqlServerApi = SqlServerApi.PYODBC,
+    encrypt: Optional[bool] = None,
+    trust_server_certificate: Optional[bool] = None,
 ) -> ConnectionInfo: ...
 @overload
 def from_values_mssql(
@@ -169,6 +193,8 @@ def from_values_mssql(
     user_pwd: SecretStr,
     unique_id: Optional[str] = None,
     api: SqlServerApi = SqlServerApi.PYODBC,
+    encrypt: Optional[bool] = None,
+    trust_server_certificate: Optional[bool] = None,
 ) -> ConnectionInfo: ...
 
 def from_values_mssql(
@@ -181,6 +207,8 @@ def from_values_mssql(
     user_pwd: Optional[SecretStr] = None,
     unique_id: Optional[str] = None,
     api: SqlServerApi = SqlServerApi.PYODBC,
+    encrypt: Optional[bool] = None,
+    trust_server_certificate: Optional[bool] = None,
 ) -> ConnectionInfo:
     """Build a SQL Server connection from individual values.
 
@@ -214,10 +242,16 @@ def from_values_mssql(
         case AuthType.SQL_AUTH:
             if user_name is None or user_pwd is None:
                 raise ValueError("SQL Authentication needs user_name and 'user_pwd' to be 'passed'")
-            conn_url = mssql.sql_auth(driver, server, database, user_name, user_pwd, api)
+            conn_url = mssql.sql_auth(
+                driver, server, database, user_name, user_pwd, api,
+                encrypt, trust_server_certificate,
+            )
 
         case AuthType.MICROSOFT_AUTH:
-            conn_url = mssql.microsoft_auth(driver, server, database, api)
+            conn_url = mssql.microsoft_auth(
+                driver, server, database, api,
+                encrypt, trust_server_certificate,
+            )
 
     return ConnectionInfo(conn_url, unique_id)
 

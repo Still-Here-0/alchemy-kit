@@ -42,4 +42,6 @@ class Settings(NotInstantiable):
         database_marker = "database"
         user_name_marker = "user_name"
         user_pwd_marker = "user_pwd"
+        encrypt_marker = "encrypt"
+        trust_server_certificate_marker = "trust_server_certificate"
 

@@ -2,9 +2,12 @@ from typing import TypeAlias, get_args
 from enum import StrEnum
 
 class SqlServerODBC(StrEnum):
-    DRIVER_17 = "ODBC Driver 17 for SQL Server"
-    DRIVER_11 = "ODBC Driver 11 for SQL Server"
-    SQL_SERVER = "SQL Server"
+    DRIVER_18   = "ODBC Driver 18 for SQL Server"
+    DRIVER_17   = "ODBC Driver 17 for SQL Server"
+    DRIVER_13_1 = "ODBC Driver 13.1 for SQL Server"
+    DRIVER_13   = "ODBC Driver 13 for SQL Server"
+    DRIVER_11   = "ODBC Driver 11 for SQL Server"
+    SQL_SERVER  = "SQL Server"
 
 
 class SqlServerNative(StrEnum):
