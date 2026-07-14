@@ -1,11 +1,14 @@
 import re
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import pandas as pd
 from pandera.typing import DataFrame
+from sqlalchemy.engine.interfaces import ReflectedCheckConstraint, ReflectedUniqueConstraint
 from sqlalchemy.exc import NoSuchTableError
 
 from ...connect._engine_handler import EngineHandler
+from ...resources._sql import SQL
 from ...resources.dialect_map import DialectMap, ReflectedTypeFacts, get_map
 from ...types.dialect_types import DialectTypes
 from .._schema_config import SchemaConfig
@@ -33,6 +36,16 @@ _SYSTEM_SCHEMAS: dict[DialectTypes, frozenset[str]] = {
 _SYSTEM_SCHEMA_PREFIXES: dict[DialectTypes, tuple[str, ...]] = {
     DialectTypes.MSSQL: ("db_",),
     DialectTypes.POSTGRESQL: ("pg_",),
+}
+
+_FALLBACK_SQL_DIR = Path(__file__).parent / "_sql"
+
+_UNIQUE_CONSTRAINTS_FALLBACK_SQL: dict[DialectTypes, str] = {
+    DialectTypes.MSSQL: "mssql_unique_constraints",
+}
+
+_CHECK_CONSTRAINTS_FALLBACK_SQL: dict[DialectTypes, str] = {
+    DialectTypes.MSSQL: "mssql_check_constraints",
 }
 
 
@@ -166,7 +179,7 @@ class MetadataExtractor:
                 index_type="PRIMARY KEY",
             )
 
-        for constraint in self._inspector.get_unique_constraints(object_name, schema=schema_name):
+        for constraint in self._get_unique_constraints(schema_name, object_name):
             add_cluster(
                 constraint.get("name") or f"uq_{object_name}",
                 constraint["column_names"],
@@ -217,11 +230,7 @@ class MetadataExtractor:
         return ListForeignKeys.validate(df)
 
     def list_check_constraints(self, schema_name: str, object_name: str) -> DataFrame[ListCheckConstraints]:
-        try:
-            checks = self._inspector.get_check_constraints(object_name, schema=schema_name)
-        except NotImplementedError:
-            checks = []
-
+        checks = self._get_check_constraints(schema_name, object_name)
         column_names = [column["name"] for column in self._get_columns(schema_name, object_name)]
 
         rows = []
@@ -261,10 +270,71 @@ class MetadataExtractor:
         pk = self._inspector.get_pk_constraint(object_name, schema=schema_name)
         return list(pk.get("constrained_columns") or []) if pk else []
 
+    def _get_unique_constraints(self, schema_name: str, object_name: str) -> list[ReflectedUniqueConstraint]:
+        try:
+            return self._inspector.get_unique_constraints(object_name, schema=schema_name)
+        except NotImplementedError:
+            return self._unique_constraints_fallback(schema_name, object_name)
+
+    def _unique_constraints_fallback(self, schema_name: str, object_name: str) -> list[ReflectedUniqueConstraint]:
+        data = self._run_fallback_sql(_UNIQUE_CONSTRAINTS_FALLBACK_SQL, schema_name, object_name)
+        if data is None:
+            return []
+
+        grouped: dict[str, list[str]] = {}
+        for row in data.itertuples(index=False):
+            grouped.setdefault(str(row.constraint_name), []).append(str(row.column_name))
+
+        return [
+            ReflectedUniqueConstraint(
+                name=name,
+                column_names=columns,
+                comment=None,
+                duplicates_index=None,
+                dialect_options={},
+            )
+            for name, columns in grouped.items()
+        ]
+
+    def _get_check_constraints(self, schema_name: str, object_name: str) -> list[ReflectedCheckConstraint]:
+        try:
+            return self._inspector.get_check_constraints(object_name, schema=schema_name)
+        except NotImplementedError:
+            return self._check_constraints_fallback(schema_name, object_name)
+
+    def _check_constraints_fallback(self, schema_name: str, object_name: str) -> list[ReflectedCheckConstraint]:
+        data = self._run_fallback_sql(_CHECK_CONSTRAINTS_FALLBACK_SQL, schema_name, object_name)
+        if data is None:
+            return []
+
+        return [
+            ReflectedCheckConstraint(
+                name=str(row.constraint_name),
+                sqltext=str(row.sqltext),
+                comment=None,
+                dialect_options={},
+            )
+            for row in data.itertuples(index=False)
+        ]
+
+    def _run_fallback_sql(self, sql_names: Mapping[DialectTypes, str], schema_name: str, object_name: str) -> pd.DataFrame | None:
+        sql_name = sql_names.get(self._dialect)
+        if sql_name is None:
+            return None
+
+        sql = SQL(
+            sql_path=sql_name,
+            query_parameters={"schema_name": schema_name, "object_name": object_name},
+        )
+        sql.set_script_dir(_FALLBACK_SQL_DIR)
+
+        _, data = self._handler.run_sql(sql)
+        return data
+
     def _get_single_column_uniques(self, schema_name: str, object_name: str) -> set[str]:
         unique_columns: set[str] = set()
 
-        for constraint in self._inspector.get_unique_constraints(object_name, schema=schema_name):
+        for constraint in self._get_unique_constraints(schema_name, object_name):
             if len(constraint["column_names"]) == 1:
                 unique_columns.add(constraint["column_names"][0])
 
