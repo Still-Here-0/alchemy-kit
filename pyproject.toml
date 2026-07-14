@@ -25,8 +25,9 @@ all = ["alchemy-kit[mssql,mysql,mariadb,postgresql,oracle]"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatchling.build.targets.wheel]
-packages = ["alchemy-kit"]
+[tool.hatch.build.targets.wheel]
+packages = ["alchemy_kit"]
+force-include = { "alchemy_kit/py.typed" = "alchemy_kit/py.typed" }
 
 [dependency-groups]
 dev = [
