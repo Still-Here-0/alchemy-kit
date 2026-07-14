@@ -1,7 +1,6 @@
 import random
 import string
 from pathlib import Path
-from typing import Optional
 
 import sqlalchemy
 
@@ -29,7 +28,7 @@ class ConnectionInfo:
             resolved or set.
     """
 
-    def __init__(self, conn_url: sqlalchemy.URL, unique_id: Optional[str]) -> None:
+    def __init__(self, conn_url: sqlalchemy.URL, unique_id: str | None = None) -> None:
         self.script_dir: Path | None = None
         self.con_url = conn_url
         self.dialect = self._resolve_dialect(conn_url)

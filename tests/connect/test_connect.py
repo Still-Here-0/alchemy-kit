@@ -3,11 +3,10 @@ from pathlib import Path
 import sqlalchemy
 from pydantic import SecretStr
 
-from alchemy_kit.connect._engine_manager import EngineManager
+from alchemy_kit.connect import EngineManager, ConnectionInfo
 from alchemy_kit.connect.info_builder import (
     from_env,
     from_json,
-    from_url,
     from_values_mssql,
 )
 from alchemy_kit.types.auth_types import AuthType
@@ -23,7 +22,7 @@ def test_init_info():
     assert isinstance(b.unique_id, str)
 
     url = sqlalchemy.URL.create("mssql")
-    c = from_url(url)
+    c = ConnectionInfo(url)
     assert isinstance(c.unique_id, str)
 
     d = from_values_mssql(
@@ -44,7 +43,7 @@ def test_init_info():
 
 def test_manager():
     url = sqlalchemy.URL.create("sqlite")
-    info = from_url(url, "a")
+    info = ConnectionInfo(url, "a")
 
     with EngineManager(None) as manager:
         handler = manager.create_engine(info)
