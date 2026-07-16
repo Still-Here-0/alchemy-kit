@@ -49,6 +49,9 @@ class SQL:
         return full_file_path.resolve()
 
     def _convert_parameters(self, query: str) -> str:
+        if "@" not in query:
+            return query
+
         parameters: list[str]
         if isinstance(self.query_parameters, Sequence):
             parameters = list(self.query_parameters[0].keys())

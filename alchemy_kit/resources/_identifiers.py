@@ -25,7 +25,7 @@ class Identifiers:
             "Series", "datetime",
 
             # object unit
-            "get_metadata", "set_alias"
+            "get_metadata", "set_alias",
         }
     )
 

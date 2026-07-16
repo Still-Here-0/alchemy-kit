@@ -3,7 +3,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.sql.expression import ColumnElement, FromClause, Join, Select
 
-from ..model.units import BooleanColumnUnit, ColumnUnit, ObjectUnit
+from ..model.units import BooleanColumnUnit, ColumnUnit, ObjectUnit, OrderingColumnUnit
 from ..types.sql_types import SqlJoinTypes
 from ._base import SqlBuilder
 
@@ -16,14 +16,20 @@ _JOIN_FLAGS: dict[SqlJoinTypes, dict[str, bool]] = {
 
 class SelectBuilder(SqlBuilder):
     """Builds a ``SELECT`` statement from column and/or object units; the
-    dialect comes from the first unit's model and every fluent method
-    returns a new builder."""
+    dialect comes from the first bound unit's engine handler and every
+    fluent method returns a new builder."""
 
     def __init__(self, *columns: "ColumnUnit[Any] | ObjectUnit[Any]") -> None:
         if not columns:
             raise ValueError("SelectBuilder needs at least one column or object unit")
 
-        super().__init__(columns[0]._base)
+        base = next((c._base for c in columns if c._base is not None), None)
+        handler = next((c._handler for c in columns if c._handler is not None), None)
+        if base is None or handler is None:
+            raise ValueError("SelectBuilder needs at least one unit bound to a model")
+
+        super().__init__(base, handler)
+        self._check_units(*columns)
         self._stmt: Select[Any] = sa.select(*(self._selected(c) for c in columns))
         self._from: FromClause | None = None
 
@@ -42,6 +48,12 @@ class SelectBuilder(SqlBuilder):
         return column._element
 
     @staticmethod
+    def _ordering_element(
+        column: "ColumnUnit[Any] | OrderingColumnUnit[Any]",
+    ) -> ColumnElement[Any]:
+        return column._element
+
+    @staticmethod
     def _required_condition(
         how: SqlJoinTypes, on: "BooleanColumnUnit[Any] | None"
     ) -> ColumnElement[bool]:
@@ -53,7 +65,7 @@ class SelectBuilder(SqlBuilder):
         self, stmt: Select[Any], joined: FromClause | None = None
     ) -> "SelectBuilder":
         clone = SelectBuilder.__new__(SelectBuilder)
-        SqlBuilder.__init__(clone, self._base)
+        SqlBuilder.__init__(clone, self._base, self._handler)
         clone._stmt = stmt
         clone._from = joined if joined is not None else self._from
         return clone
@@ -65,6 +77,7 @@ class SelectBuilder(SqlBuilder):
 
     def where(self, *conditions: BooleanColumnUnit[Any]) -> "SelectBuilder":
         """Add ``WHERE`` conditions (multiple conditions are ``AND``-ed)."""
+        self._check_units(*conditions)
         return self._with(
             self._stmt.where(*(self._condition_element(c) for c in conditions))
         )
@@ -78,6 +91,7 @@ class SelectBuilder(SqlBuilder):
         """Add a join to ``other``; ``CROSS`` takes no ``on`` condition and
         ``RIGHT`` compiles as the equivalent operand-flipped ``LEFT OUTER
         JOIN``."""
+        self._check_units(*(other,) if on is None else (other, on))
         left = self._from if self._from is not None else self._stmt.get_final_froms()[0]
 
         joined: Join
@@ -102,21 +116,26 @@ class SelectBuilder(SqlBuilder):
 
     def group_by(self, *columns: ColumnUnit[Any]) -> "SelectBuilder":
         """Add ``GROUP BY`` expressions."""
+        self._check_units(*columns)
         return self._with(
             self._stmt.group_by(*(self._column_element(c) for c in columns))
         )
 
     def having(self, *conditions: BooleanColumnUnit[Any]) -> "SelectBuilder":
         """Add ``HAVING`` conditions (multiple conditions are ``AND``-ed)."""
+        self._check_units(*conditions)
         return self._with(
             self._stmt.having(*(self._condition_element(c) for c in conditions))
         )
 
-    def order_by(self, *columns: ColumnUnit[Any]) -> "SelectBuilder":
+    def order_by(
+        self, *columns: "ColumnUnit[Any] | OrderingColumnUnit[Any]"
+    ) -> "SelectBuilder":
         """Add ``ORDER BY`` expressions (direction via the column's
         ``asc()``/``desc()``)."""
+        self._check_units(*columns)
         return self._with(
-            self._stmt.order_by(*(self._column_element(c) for c in columns))
+            self._stmt.order_by(*(self._ordering_element(c) for c in columns))
         )
 
     def distinct(self) -> "SelectBuilder":

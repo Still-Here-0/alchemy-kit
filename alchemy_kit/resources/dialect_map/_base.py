@@ -59,6 +59,9 @@ class DialectMap[_TypeParameters: str](ABC):
     _quote_open: ClassVar[str] = '"'
     _quote_close: ClassVar[str] = '"'
 
+    max_insert_rows: ClassVar[int | None] = None
+    max_statement_params: ClassVar[int | None] = None
+
     @classmethod
     def quote_identifier(cls, name: str) -> str:
         """Quote a schema/table/column name with the dialect's delimiters,
@@ -83,9 +86,14 @@ class DialectMap[_TypeParameters: str](ABC):
             ) from None
 
     @classmethod
-    def get_sa_type(cls, sql_type: str | None) -> sa.types.TypeEngine[Any]:
+    def get_sa_type(
+        cls,
+        sql_type: str | None,
+        precision: int | None = None,
+        scale: int | None = None,
+    ) -> sa.types.TypeEngine[Any]:
         """Map a raw SQL type name to a SQLAlchemy type instance for Core
-        compilation.
+        compilation, parameterised with ``precision``/``scale`` for numerics.
 
         ``None`` (a column with no recorded type) compiles as ``NullType``,
         which is valid anywhere a concrete type is not required (it cannot be
@@ -96,11 +104,19 @@ class DialectMap[_TypeParameters: str](ABC):
             return sa.types.NullType()
 
         try:
-            return cls.sa_types[sql_type.lower()]()
+            sa_type = cls.sa_types[sql_type.lower()]()
         except KeyError:
             raise ValueError(
                 f"{cls.__name__}: no SQLAlchemy mapping for SQL type {sql_type!r}"
             ) from None
+
+        if isinstance(sa_type, sa.Numeric):
+            if precision:
+                sa_type.precision = precision
+            if scale:
+                sa_type.scale = scale
+
+        return sa_type
 
     @classmethod
     def reflected_type_facts(cls, sa_type: Any) -> ReflectedTypeFacts:

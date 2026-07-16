@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
+from ...connect._engine_handler import EngineHandler
 from ...resources.dialect_map import get_codegen_imports, get_type
 from ...types import DialectTypes, sql_type_parameters
 from .._model.column_model import ColumnModel
@@ -27,6 +28,7 @@ class StubFileBuilder:
         template = self.template.read_text("UTF-8").format(
             class_name=self.class_name,
             base_model_module=BaseModel.__module__,
+            engine_handler_module=EngineHandler.__module__,
             object_unit_module=units.__name__,
             column_unit_module=units.__name__,
             type_parameters_module=sql_type_parameters.__name__,

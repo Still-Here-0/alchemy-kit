@@ -118,6 +118,8 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
     dialect_paramaters = frozenset(get_args(MssqlTypeParameters))
     _quote_open = "["
     _quote_close = "]"
+    max_insert_rows = 1000
+    max_statement_params = 2100
 
     @classmethod
     def reflected_type_facts(cls, sa_type: object) -> ReflectedTypeFacts:

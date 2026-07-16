@@ -9,6 +9,7 @@
 # --------------------------------------------------------------------------------
 
 from {base_model_module} import BaseModel
+from {engine_handler_module} import EngineHandler
 from {object_unit_module} import ObjectUnit
 from {column_unit_module} import ColumnUnit
 from {type_parameters_module} import {type_parameters}
@@ -20,7 +21,7 @@ class {class_name}(BaseModel[{type_parameters}]):
     :columns
 
     @classmethod
-    def get_unit(cls) -> {class_name}_Unit: ...
+    def _get_unit(cls, handler: EngineHandler) -> {class_name}_Unit: ...
 
 class {class_name}_Unit(ObjectUnit[{type_parameters}]):
     :unit_columns

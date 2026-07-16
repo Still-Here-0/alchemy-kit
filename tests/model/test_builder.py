@@ -1,3 +1,4 @@
+from inspect import isgenerator
 import shutil
 from pathlib import Path
 from typing import cast
@@ -124,5 +125,16 @@ def test_mssql_local_build():
     conn = info_builder.from_env(ROOT/".env-mssql")
     config = SchemaConfig()
     config.include_schema("uploader")
-    build(conn, ROOT/"secret_local_mssql", schema_config=config, clear_result_dir=True)
+    build(conn, ROOT/"model"/"secret_local_mssql", schema_config=config, clear_result_dir=True)
+    from alchemy_kit import builder
+    from secret_local_mssql.uploader import SHEET
+    from alchemy_kit.connect import EngineManager
+    with EngineManager(None) as manager:
+        handler = manager.create_engine(conn)
+        sheet = handler.get_unit(SHEET)
+        select = builder.SelectBuilder(sheet)
+        _, df = select.run()
+        df = df[[SHEET.Description, SHEET.TableName, SHEET.LastEditedBy_fk, SHEET.Active, SHEET.DaysToRefresh, SHEET.Model, SHEET.RequestAfterUpdate]]
+        insert = builder.InsertBuilder(handler.get_unit(SHEET)).from_dataframe(df)
+        insert.run()
 

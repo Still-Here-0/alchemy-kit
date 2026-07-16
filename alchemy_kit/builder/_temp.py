@@ -3,6 +3,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.schema import CreateTable
 
+from ..model._table import clone_table
 from ..model.units import ObjectUnit
 from ..types.dialect_types import DialectTypes
 from ._base import SqlBuilder
@@ -17,34 +18,27 @@ class TempBuilder(SqlBuilder):
     """
 
     def __init__(self, source: ObjectUnit[Any], global_temp: bool = False) -> None:
-        super().__init__(source._base)
+        super().__init__(source._base, source._handler)
 
         table = source._selectable
         if not isinstance(table, sa.Table):
             raise TypeError("temp source must be a plain object unit, not an aliased one")
 
+        dialect = self._handler._con_info.dialect
         temp_name = f"TEMP_{table.name}"
         prefixes: list[str] = ["TEMPORARY"]
 
-        if self._base._dialect is DialectTypes.MSSQL:
+        if dialect is DialectTypes.MSSQL:
             temp_name = f"{'##' if global_temp else '#'}{temp_name}"
             prefixes = []
-        elif self._base._dialect is DialectTypes.ORACLE:
+        elif dialect is DialectTypes.ORACLE:
             prefixes = ["GLOBAL TEMPORARY"]
         elif global_temp:
             raise ValueError(
-                f"{self._base._dialect} does not support global temporary tables"
+                f"{dialect} does not support global temporary tables"
             )
 
-        self._table = sa.Table(
-            temp_name,
-            sa.MetaData(),
-            *(
-                sa.Column(c.name, c.type, nullable=c.nullable, primary_key=c.primary_key)
-                for c in table.columns
-            ),
-            prefixes=prefixes,
-        )
+        self._table = clone_table(table, temp_name, prefixes)
 
     def _statement(self) -> CreateTable:
         return CreateTable(self._table)
@@ -52,5 +46,5 @@ class TempBuilder(SqlBuilder):
     def unit(self) -> ObjectUnit[Any]:
         """Return an :class:`ObjectUnit` over the temporary table, for
         selecting from / inserting into it after :meth:`run`."""
-        return ObjectUnit(self._base, self._table)
+        return ObjectUnit(self._base, self._handler, self._table)
 

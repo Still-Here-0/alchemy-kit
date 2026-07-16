@@ -1,6 +1,6 @@
 
 import copy
-from typing import TYPE_CHECKING, Any, ClassVar, Iterator, NotRequired, Self, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Iterator, NotRequired, Self, TypedDict, cast
 
 import pandas as pd
 from pandera.api.base.model import MetaModel
@@ -8,8 +8,6 @@ from pandera.pandas import DataFrameModel
 from pandera.typing import DataFrame
 
 from ..resources._sql import SQL
-from ..resources.dialect_map import DialectMap
-from ..types.dialect_types import DialectTypes
 from ..types.errors._model_validation_error import ModelValidationError
 
 if TYPE_CHECKING:
@@ -37,9 +35,6 @@ class _BaseModelMeta(MetaModel):
 
 class BaseModel[_TypeParameters: str](DataFrameModel, metaclass=_BaseModelMeta):
     """Base pandera model that validates a DataFrame against a SQL object's schema."""
-
-    _dialect: ClassVar[DialectTypes]
-    _map: ClassVar[type[DialectMap[Any]]]
 
     @classmethod
     def _strip_timezone(cls, df: pd.DataFrame) -> pd.DataFrame:
@@ -175,12 +170,12 @@ class BaseModel[_TypeParameters: str](DataFrameModel, metaclass=_BaseModelMeta):
         return failures
     
     @classmethod
-    def get_unit(cls) -> "ObjectUnit[_TypeParameters]":
-        """Return an :class:`ObjectUnit` for this model, dialect-typed so column
-        access and ``cast`` autocomplete the model's own SQL type names."""
+    def _get_unit(cls, handler: "EngineHandler") -> "ObjectUnit[_TypeParameters]":
+        """Return an :class:`ObjectUnit` for this model bound to ``handler``'s
+        connection; called by :meth:`EngineHandler.get_unit`."""
         from .units._object_unit import ObjectUnit
 
-        return ObjectUnit(cls)
+        return ObjectUnit(cls, handler)
 
     class Config(DataFrameModel.Config):
         """Pandera validation settings for the model."""

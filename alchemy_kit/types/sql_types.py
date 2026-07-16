@@ -1,7 +1,7 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from enum import IntEnum, StrEnum
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, get_args, get_origin
 from uuid import UUID
 
 SqlScalarType: TypeAlias = (
@@ -30,7 +30,11 @@ SqlScalarType: TypeAlias = (
     | IntEnum
 )
 
-SqlExpandType: TypeAlias = list | set | tuple
+SqlExpandType: TypeAlias = list[SqlScalarType] | set[SqlScalarType] | tuple[SqlScalarType, ...]
+
+SQL_EXPAND_CLASSES: tuple[type, ...] = tuple(
+    get_origin(t) or t for t in get_args(SqlExpandType)
+)
 
 SqlParamType: TypeAlias = SqlScalarType | SqlExpandType
 

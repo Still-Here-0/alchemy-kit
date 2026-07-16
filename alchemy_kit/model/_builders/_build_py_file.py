@@ -33,7 +33,7 @@ class PyFileBuilder:
         }
 
     def build(self) -> str:
-        map_module, parameter_map, type_parameters = get_codegen_imports(self.db_dialect)
+        _, _, type_parameters = get_codegen_imports(self.db_dialect)
         check_methods, unparsed_table_checks = self._build_table_checks()
         index_methods, unparsed_indexes = self._build_index_checks()
         check_methods += index_methods
@@ -41,13 +41,9 @@ class PyFileBuilder:
         template = self.template.read_text("UTF-8")
         template = template.format(
             class_name=self.class_name,
-            dialect=f"DialectTypes.{self.db_dialect.name}",
             base_model_module=BaseModel.__module__,
-            dialect_types_module=DialectTypes.__module__,
             type_parameters_module=sql_type_parameters.__name__,
             type_parameters=type_parameters,
-            parameter_map_module=map_module,
-            parameter_map=parameter_map,
             unique=f"unique={self.object_model.get_unique_constrait()!r}",
             metadata=self._get_object_metadata(unparsed_table_checks, unparsed_indexes),
         )

@@ -1,12 +1,16 @@
-from typing import Literal, Sequence, cast
+from typing import Literal, Protocol, Sequence, cast
 
 import pandas as pd
 import sqlalchemy
 
 from ..resources._sql import SQL
 from ..types._sql_parameters import SqlParamMap
-from ..types.sql_types import SqlExpandType
+from ..types.sql_types import SQL_EXPAND_CLASSES
 from ._info import ConnectionInfo
+
+
+class _UnitFactory[_UnitT](Protocol):
+    def _get_unit(self, handler: "EngineHandler") -> _UnitT: ...
 
 
 class EngineHandler:
@@ -24,6 +28,11 @@ class EngineHandler:
     def __init__(self, engine: sqlalchemy.Engine, con_info: ConnectionInfo) -> None:
         self._engine = engine
         self._con_info = con_info
+
+    def get_unit[_UnitT](self, model: _UnitFactory[_UnitT]) -> _UnitT:
+        """Return a unit for ``model``, bound to this handler's connection and
+        compiled with its dialect."""
+        return model._get_unit(self)
 
     def get_inspector(self) -> sqlalchemy.Inspector:
         """Return a SQLAlchemy ``Inspector`` bound to this handler's engine."""
@@ -93,7 +102,7 @@ class EngineHandler:
 
     def _execute_with_binded_parameters(self, conn: sqlalchemy.Connection, query: sqlalchemy.TextClause, parameters: SqlParamMap) -> sqlalchemy.CursorResult:
         binds = [
-            sqlalchemy.bindparam(key, value, expanding=isinstance(value, SqlExpandType))
+            sqlalchemy.bindparam(key, value, expanding=isinstance(value, SQL_EXPAND_CLASSES))
             for key, value in parameters.items()
         ]
 
