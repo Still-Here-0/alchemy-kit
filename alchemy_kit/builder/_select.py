@@ -15,23 +15,21 @@ _JOIN_FLAGS: dict[SqlJoinTypes, dict[str, bool]] = {
 
 
 class SelectBuilder(SqlBuilder):
-    """Builds a ``SELECT`` statement from column and/or object units; the
-    dialect comes from the first bound unit's engine handler and every
-    fluent method returns a new builder."""
+    """Builds a ``SELECT`` statement over ``table`` (the ``FROM`` clause);
+    when no columns are given every column of ``table`` is selected. The
+    dialect comes from the table's engine handler and every fluent method
+    returns a new builder."""
 
-    def __init__(self, *columns: "ColumnUnit[Any] | ObjectUnit[Any]") -> None:
-        if not columns:
-            raise ValueError("SelectBuilder needs at least one column or object unit")
-
-        base = next((c._base for c in columns if c._base is not None), None)
-        handler = next((c._handler for c in columns if c._handler is not None), None)
-        if base is None or handler is None:
-            raise ValueError("SelectBuilder needs at least one unit bound to a model")
-
-        super().__init__(base, handler)
-        self._check_units(*columns)
-        self._stmt: Select[Any] = sa.select(*(self._selected(c) for c in columns))
-        self._from: FromClause | None = None
+    def __init__(
+        self,
+        from_: ObjectUnit[Any],
+        *columns: "ColumnUnit[Any] | ObjectUnit[Any]",
+    ) -> None:
+        super().__init__(from_._base, from_._handler)
+        self._check_units(from_, *columns)
+        selected = columns if columns else (from_,)
+        self._stmt: Select[Any] = sa.select(*(self._selected(c) for c in selected))
+        self._from: FromClause = from_._selectable
 
     @staticmethod
     def _selected(column: "ColumnUnit[Any] | ObjectUnit[Any]") -> Any:
@@ -71,8 +69,6 @@ class SelectBuilder(SqlBuilder):
         return clone
 
     def _statement(self) -> Select[Any]:
-        if self._from is None:
-            return self._stmt
         return self._stmt.select_from(self._from)
 
     def where(self, *conditions: BooleanColumnUnit[Any]) -> "SelectBuilder":
@@ -92,7 +88,7 @@ class SelectBuilder(SqlBuilder):
         ``RIGHT`` compiles as the equivalent operand-flipped ``LEFT OUTER
         JOIN``."""
         self._check_units(*(other,) if on is None else (other, on))
-        left = self._from if self._from is not None else self._stmt.get_final_froms()[0]
+        left = self._from
 
         joined: Join
         match how:
