@@ -71,6 +71,23 @@ class SelectBuilder(SqlBuilder):
     def _statement(self) -> Select[Any]:
         return self._stmt.select_from(self._from)
 
+    def as_scalar(self) -> "ColumnUnit[Any]":
+        """Return this select as a scalar subquery value unit, usable in a
+        select list, comparison or other value context; the select must
+        produce a single column. Outer columns referenced in ``where`` make
+        it a correlated subquery."""
+        return ColumnUnit(
+            self._statement().scalar_subquery(), self._base, self._handler
+        )
+
+    def as_object(self, name: str) -> "ObjectUnit[Any]":
+        """Return this select as a named derived table usable as a ``FROM``
+        source or join target; its columns are reached by the source models'
+        field names, same as any object unit."""
+        return ObjectUnit(
+            self._base, self._handler, self._statement().subquery(name)
+        )
+
     def where(self, *conditions: BooleanColumnUnit[Any]) -> "SelectBuilder":
         """Add ``WHERE`` conditions (multiple conditions are ``AND``-ed)."""
         self._check_units(*conditions)

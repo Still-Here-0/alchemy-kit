@@ -597,3 +597,91 @@ def test_deferred_parameter_override(handler: EngineHandler):
     builder = SelectBuilder(t, t.name).where(t.price > 1)
     _, df = builder.run(price_1=8)
     assert df["name"].tolist() == ["dear"]
+
+
+def test_scalar_subquery_renders_top_on_mssql():
+    m = MSSQL_HANDLER.get_unit(mssql_items)
+    sub = MSSQL_HANDLER.get_unit(mssql_items).set_alias("sub")
+    latest = (
+        SelectBuilder(sub, sub.id_1)
+        .order_by(sub.id_1.desc())
+        .limit(1)
+        .as_scalar()
+        .set_alias("latest")
+    )
+    rendered = SelectBuilder(m, m.id_1, latest).render()
+    assert "TOP 1" in rendered
+    assert "latest" in rendered
+
+
+def test_scalar_subquery_renders_limit_on_sqlite():
+    i = SQLITE_HANDLER.get_unit(items)
+    sub = SQLITE_HANDLER.get_unit(items).set_alias("sub")
+    latest = SelectBuilder(sub, sub.id_1).order_by(sub.id_1.desc()).limit(1).as_scalar()
+    rendered = SelectBuilder(i, i.name, latest).render()
+    assert "LIMIT" in rendered
+    assert "TOP" not in rendered
+
+
+def test_scalar_subquery_correlates_on_outer_column():
+    i = SQLITE_HANDLER.get_unit(items)
+    p = SQLITE_HANDLER.get_unit(parts)
+    label = (
+        SelectBuilder(p, p.label).where(p.id_1 == i.id_1).limit(1).as_scalar().set_alias("label")
+    )
+    rendered = SelectBuilder(i, i.name, label).render()
+    assert rendered.count("FROM main.items") == 1
+    assert "FROM main.parts" in rendered
+
+
+def test_scalar_subquery_runs(handler: EngineHandler):
+    items_tmp = TempBuilder(handler.get_unit(items))
+    items_tmp.run()
+    parts_tmp = TempBuilder(handler.get_unit(parts))
+    parts_tmp.run()
+
+    t, p = items_tmp.unit(), parts_tmp.unit()
+    InsertBuilder(t).from_values(id_1=1, name="bolt", price=0.5).run()
+    InsertBuilder(t).from_values(id_1=2, name="nut", price=1.5).run()
+    InsertBuilder(p).from_values(id_1=1, label="washer").run()
+    InsertBuilder(p).from_values(id_1=2, label="gear").run()
+
+    label = (
+        SelectBuilder(p, p.label).where(p.id_1 == t.id_1).limit(1).as_scalar().set_alias("label")
+    )
+    _, df = SelectBuilder(t, t.name, label).order_by(t.id_1).run()
+    assert df["label"].tolist() == ["washer", "gear"]
+
+
+def test_from_subquery_join_renders_derived_table():
+    i = SQLITE_HANDLER.get_unit(items)
+    p = SQLITE_HANDLER.get_unit(parts)
+    active = SelectBuilder(p, p).where(p.id_1 > 1).as_object("p")
+    rendered = SelectBuilder(i, i.name, active.label).join(
+        "INNER", active, i.id_1 == active.id_1
+    ).render()
+    assert "JOIN (SELECT" in rendered
+    assert ") AS p" in rendered
+    assert "WHERE" in rendered
+
+
+def test_from_subquery_join_runs(handler: EngineHandler):
+    items_tmp = TempBuilder(handler.get_unit(items))
+    items_tmp.run()
+    parts_tmp = TempBuilder(handler.get_unit(parts))
+    parts_tmp.run()
+
+    t, p = items_tmp.unit(), parts_tmp.unit()
+    InsertBuilder(t).from_values(id_1=1, name="bolt", price=0.5).run()
+    InsertBuilder(t).from_values(id_1=2, name="nut", price=1.5).run()
+    InsertBuilder(p).from_values(id_1=1, label="washer").run()
+    InsertBuilder(p).from_values(id_1=2, label="gear").run()
+
+    active = SelectBuilder(p, p).where(p.id_1 > 1).as_object("p")
+    _, df = (
+        SelectBuilder(t, t.name, active.label)
+        .join("INNER", active, t.id_1 == active.id_1)
+        .run()
+    )
+    assert df["name"].tolist() == ["nut"]
+    assert df["label"].tolist() == ["gear"]
