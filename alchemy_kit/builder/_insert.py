@@ -103,21 +103,38 @@ class InsertBuilder(SqlBuilder):
 
         return self._with(self._stmt.from_select(names, stmt))
 
+    def to_sqls(
+        self,
+        *,
+        chunk_size: int | None = None,
+        **parameters: Any,
+    ) -> list[SQL]:
+        """Compile the insert into one or more dialect-safe SQL statements.
+
+        Multi-row inserts are split according to the dialect's row and
+        parameter limits, further restricted by ``chunk_size`` when given.
+        """
+        rows = [row for group in self._stmt._multi_values for row in group]
+        effective = self._effective_chunk_size(chunk_size, rows)
+
+        if effective is None or len(rows) <= effective:
+            return [super().to_sql(**parameters)]
+
+        return [
+            self._chunk_sql(rows[start:start + effective], parameters)
+            for start in range(0, len(rows), effective)
+        ]
+
     def run(self, *, chunk_size: int | None = None, **parameters: Any) -> tuple[int | None, pd.DataFrame]:
         """Execute the insert; a multi-row ``from_dataframe`` insert that would
         exceed the dialect's per-statement row/parameter limits (or
         ``chunk_size`` when given) is split into chunks run in one
         all-or-nothing transaction."""
-        rows = [row for group in self._stmt._multi_values for row in group]
-        effective = self._effective_chunk_size(chunk_size, rows)
+        sqls = self.to_sqls(chunk_size=chunk_size, **parameters)
 
-        if effective is None or len(rows) <= effective:
-            return super().run(**parameters)
+        if len(sqls) == 1:
+            return self._handler.run_sql(sqls[0])
 
-        sqls = [
-            self._chunk_sql(rows[start:start + effective])
-            for start in range(0, len(rows), effective)
-        ]
         counts = [count for count, _ in self._handler.run_sqls(sqls)]
 
         if any(count is None for count in counts):
@@ -143,10 +160,16 @@ class InsertBuilder(SqlBuilder):
             return chunk_size
         return min(chunk_size, safe_max)
 
-    def _chunk_sql(self, chunk: Sequence[Any]) -> SQL:
+    def _chunk_sql(
+        self,
+        chunk: Sequence[Any],
+        parameters: dict[str, Any],
+    ) -> SQL:
         compiled = sa.insert(self._table).values(list(chunk)).compile(
             dialect=self._sa_dialect(),
             compile_kwargs={"render_postcompile": True},
         )
-        return SQL(raw_query=str(compiled), query_parameters={**(compiled.params or {})})
-
+        return SQL(
+            raw_query=str(compiled),
+            query_parameters={**(compiled.params or {}), **parameters},
+        )

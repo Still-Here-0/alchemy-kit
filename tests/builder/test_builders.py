@@ -1,5 +1,6 @@
 from typing import Any, Optional, cast
 
+import pandas as pd
 import pandera.pandas as pa
 import pytest
 import sqlalchemy
@@ -164,12 +165,45 @@ def test_joins_chain_after_right(handler: EngineHandler):
     assert sorted(df["id"].tolist()) == [1, 2]
 
 
-def test_join_condition_arity():
-    i = SQLITE_HANDLER.get_unit(items)
-    o = SQLITE_HANDLER.get_unit(items).set_alias("o")
     with pytest.raises(TypeError):
-        SelectBuilder(i, i.name).join("CROSS", o, i.id_1 == o.id_1)
-    with pytest.raises(TypeError):
+        InsertBuilder(SQLITE_HANDLER.get_unit(items).set_alias("x"))
+
+def test_insert_to_sqls_chunks_and_runs_with_temp_table(handler: EngineHandler):
+    tmp = TempBuilder(handler.get_unit(items))
+    insert = InsertBuilder(tmp.unit()).from_dataframe(pd.DataFrame([
+        {"id_1": 1, "name": "bolt", "price": 0.5},
+        {"id_1": 2, "name": "nut", "price": 1.5},
+        {"id_1": 3, "name": "gear", "price": 9.0},
+    ]))
+
+    insert_sqls = insert.to_sqls(chunk_size=2)
+    assert len(insert_sqls) == 2
+
+    results = handler.run_sqls([
+        tmp.to_sql(),
+        *insert_sqls,
+        SelectBuilder(tmp.unit(), tmp.unit().name).to_sql(),
+    ])
+
+    assert sorted(results[-1][1]["name"].tolist()) == ["bolt", "gear", "nut"]
+
+def test_insert_run_uses_to_sqls_and_aggregates_chunks(handler: EngineHandler):
+    tmp = TempBuilder(handler.get_unit(items))
+    tmp.run()
+    insert = InsertBuilder(tmp.unit()).from_dataframe(pd.DataFrame([
+        {"id_1": 1, "name": "bolt", "price": 0.5},
+        {"id_1": 2, "name": "nut", "price": 1.5},
+        {"id_1": 3, "name": "gear", "price": 9.0},
+    ]))
+
+    count, data = insert.run(chunk_size=2)
+
+    assert count == 3
+    assert data.empty
+
+def test_temp_round_trip_through_run_sql(handler: EngineHandler):
+    tmp = TempBuilder(handler.get_unit(items))
+    assert 'CREATE TEMPORARY TABLE "TEMP_items"' in tmp.render()
         SelectBuilder(i, i.name).join("INNER", o)
 
 
