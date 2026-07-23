@@ -7,6 +7,7 @@ import sqlalchemy
 from pandera.typing import Series
 
 from alchemy_kit.builder import InsertBuilder, SelectBuilder, TempBuilder
+from alchemy_kit.builder._utils import DataFrameTemp
 from alchemy_kit.connect._engine_handler import EngineHandler
 from alchemy_kit.connect._info import ConnectionInfo
 from alchemy_kit.model.base_model import BaseModel, MetaData
@@ -165,8 +166,14 @@ def test_joins_chain_after_right(handler: EngineHandler):
     assert sorted(df["id"].tolist()) == [1, 2]
 
 
+def test_join_condition_arity():
+    i = SQLITE_HANDLER.get_unit(items)
+    o = SQLITE_HANDLER.get_unit(items).set_alias("o")
     with pytest.raises(TypeError):
-        InsertBuilder(SQLITE_HANDLER.get_unit(items).set_alias("x"))
+        SelectBuilder(i, i.name).join("CROSS", o, i.id_1 == o.id_1)
+    with pytest.raises(TypeError):
+        SelectBuilder(i, i.name).join("INNER", o)
+
 
 def test_insert_to_sqls_chunks_and_runs_with_temp_table(handler: EngineHandler):
     tmp = TempBuilder(handler.get_unit(items))
@@ -200,11 +207,6 @@ def test_insert_run_uses_to_sqls_and_aggregates_chunks(handler: EngineHandler):
 
     assert count == 3
     assert data.empty
-
-def test_temp_round_trip_through_run_sql(handler: EngineHandler):
-    tmp = TempBuilder(handler.get_unit(items))
-    assert 'CREATE TEMPORARY TABLE "TEMP_items"' in tmp.render()
-        SelectBuilder(i, i.name).join("INNER", o)
 
 
 def test_insert_rejects_aliased_unit():
@@ -248,6 +250,103 @@ def test_global_temp_rejected_on_unsupported_dialect():
 def test_mssql_temp_naming():
     assert "[#TEMP_items]" in TempBuilder(MSSQL_HANDLER.get_unit(mssql_items)).render()
     assert "[##TEMP_items]" in TempBuilder(MSSQL_HANDLER.get_unit(mssql_items), global_temp=True).render()
+
+
+def test_from_dataframe_infers_column_types():
+    df = pd.DataFrame({
+        "flag": [True, False],
+        "count": [1, 2],
+        "price": [0.5, 1.5],
+        "moment": pd.to_datetime(["2024-01-01", "2024-02-01"]),
+        "span": pd.to_timedelta([1, 2], unit="D"),
+        "label": ["bolt", "a-much-longer-label"],
+        "blank": [None, None],
+    })
+    builder = TempBuilder.from_dataframe(df, SQLITE_HANDLER, "stuff")
+
+    types = {c.name: type(c.type) for c in builder._table.columns}
+    assert types == {
+        "flag": sqlalchemy.Boolean,
+        "count": sqlalchemy.BigInteger,
+        "price": sqlalchemy.Float,
+        "moment": sqlalchemy.DateTime,
+        "span": sqlalchemy.Interval,
+        "label": sqlalchemy.String,
+        "blank": sqlalchemy.String,
+    }
+
+    rendered = builder.render()
+    assert 'CREATE TEMPORARY TABLE "TEMP_stuff"' in rendered
+    assert "label VARCHAR(19)" in rendered
+    assert "blank VARCHAR(1)" in rendered
+
+
+def test_from_dataframe_infers_schema_without_rows():
+    df = pd.DataFrame({"id": pd.Series(dtype="int64"), "name": pd.Series(dtype="object")})
+    rendered = TempBuilder.from_dataframe(df, SQLITE_HANDLER, "empty").render()
+
+    assert "id BIGINT" in rendered
+    assert "name VARCHAR(1)" in rendered
+
+
+def test_from_dataframe_stringifies_column_labels():
+    builder = TempBuilder.from_dataframe(pd.DataFrame([[1, 2]]), SQLITE_HANDLER, "nums")
+    assert [c.name for c in builder._table.columns] == ["0", "1"]
+
+
+def test_from_dataframe_round_trip(handler: EngineHandler):
+    df = pd.DataFrame([
+        {"a": 1, "b": "bolt", "c": 0.5},
+        {"a": 2, "b": "nut", "c": 1.5},
+    ])
+    tmp = TempBuilder.from_dataframe(df, handler, "raw")
+    tmp.run()
+
+    t = tmp.unit()
+    InsertBuilder(t).from_dataframe(df).run()
+
+    _, out = SelectBuilder(t, t.a, t.b, t.c).where(t.c > 1).run()
+    assert out["b"].tolist() == ["nut"]
+    assert out["a"].tolist() == [2]
+
+
+def test_from_dataframe_base_resolves_model_field_names(handler: EngineHandler):
+    df = pd.DataFrame([
+        {"id": 1, "name": "bolt", "price": 0.5},
+        {"id": 2, "name": "nut", "price": 1.5},
+    ])
+    tmp = TempBuilder.from_dataframe(df, handler, "items", base=items)
+    assert 'CREATE TEMPORARY TABLE "TEMP_items"' in tmp.render()
+    tmp.run()
+
+    t = tmp.unit()
+    InsertBuilder(t).from_dataframe(df).run()
+
+    _, out = SelectBuilder(t, t.name, t.price).where(t.price > 1).order_by(t.id_1).run()
+    assert out["name"].tolist() == ["nut"]
+
+
+def test_from_dataframe_default_base_uses_raw_column_names(handler: EngineHandler):
+    tmp = TempBuilder.from_dataframe(pd.DataFrame([{"id": 1}]), handler, "raw")
+
+    assert tmp.unit()._base is DataFrameTemp
+    with pytest.raises(AttributeError):
+        tmp.unit().id_1
+
+
+def test_from_dataframe_mssql_naming():
+    df = pd.DataFrame([{"id": 1}])
+    assert "[#TEMP_stuff]" in TempBuilder.from_dataframe(df, MSSQL_HANDLER, "stuff").render()
+    assert "[##TEMP_stuff]" in TempBuilder.from_dataframe(
+        df, MSSQL_HANDLER, "stuff", global_temp=True
+    ).render()
+
+
+def test_from_dataframe_global_temp_rejected_on_unsupported_dialect():
+    with pytest.raises(ValueError):
+        TempBuilder.from_dataframe(
+            pd.DataFrame([{"id": 1}]), SQLITE_HANDLER, "stuff", global_temp=True
+        )
 
 
 def test_null_safe_comparisons(handler: EngineHandler):
