@@ -1,19 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pandas as pd
 from sqlalchemy import Compiled
 from sqlalchemy.engine import Dialect
 from sqlalchemy.sql.expression import ClauseElement
 
+from ..connect._engine_handler import EngineHandler
 from ..model.base_model import BaseModel
 from ..model.units._column_unit import _ExpressionUnit
 from ..model.units._object_unit import ObjectUnit
 from ..resources._sql import SQL
 from ..resources.dialect_map import get_sa_dialect
-
-if TYPE_CHECKING:
-    from ..connect._engine_handler import EngineHandler
 
 
 class SqlBuilder(ABC):
@@ -22,7 +20,7 @@ class SqlBuilder(ABC):
     handler the units came from. Subclasses implement ``_statement``;
     builders are immutable."""
 
-    def __init__(self, base: type[BaseModel[Any]], handler: "EngineHandler") -> None:
+    def __init__(self, base: type[BaseModel[Any]], handler: EngineHandler) -> None:
         self._base = base
         self._handler = handler
 

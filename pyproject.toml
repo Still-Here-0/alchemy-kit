@@ -44,6 +44,7 @@ root_package = "alchemy_kit"
 name = "Layered architecture"
 type = "layers"
 layers = [
+    "alchemy_kit.builder",
     "alchemy_kit.model",
     "alchemy_kit.connect",
     "alchemy_kit.resources",

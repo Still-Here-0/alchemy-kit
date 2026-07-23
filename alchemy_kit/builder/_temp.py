@@ -1,12 +1,15 @@
 from typing import Any
 
+import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy.schema import CreateTable
 
-from ..model._table import clone_table
+from ..connect._engine_handler import EngineHandler
+from ..model.base_model import BaseModel
 from ..model.units import ObjectUnit
 from ..types.dialect_types import DialectTypes
 from ._base import SqlBuilder
+from ._utils import DataFrameTemp, sa_type_from_series
 
 
 class TempBuilder(SqlBuilder):
@@ -18,14 +21,49 @@ class TempBuilder(SqlBuilder):
     """
 
     def __init__(self, source: ObjectUnit[Any], global_temp: bool = False) -> None:
-        super().__init__(source._base, source._handler)
-
         table = source._selectable
         if not isinstance(table, sa.Table):
             raise TypeError("temp source must be a plain object unit, not an aliased one")
 
-        dialect = self._handler._con_info.dialect
-        temp_name = f"TEMP_{table.name}"
+        columns = [
+            sa.Column(c.name, c.type, nullable=c.nullable, primary_key=c.primary_key)
+            for c in table.columns
+        ]
+        self._configure(source._base, source._handler, table.name, columns, global_temp)
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        df: pd.DataFrame,
+        handler: EngineHandler,
+        name: str,
+        *,
+        base: type[BaseModel[Any]] | None = None,
+        global_temp: bool = False,
+    ) -> "TempBuilder":
+        """Build a ``TempBuilder`` whose column schema is inferred from ``df``'s
+        dtypes, for a temp table named ``TEMP_<name>``.
+
+        The DataFrame's column names become the SQL column names; pass ``base``
+        to resolve them through a generated model's field names instead.
+        """
+        self = cls.__new__(cls)
+        columns = [sa.Column(str(c), sa_type_from_series(df[c])) for c in df.columns]
+        self._configure(base or DataFrameTemp, handler, name, columns, global_temp)
+        return self
+
+    def _configure(
+        self,
+        base: type[BaseModel[Any]],
+        handler: EngineHandler,
+        source_name: str,
+        columns: list[sa.Column[Any]],
+        global_temp: bool,
+    ) -> None:
+        SqlBuilder.__init__(self, base, handler)
+
+        dialect = handler._con_info.dialect
+        temp_name = f"TEMP_{source_name}"
         prefixes: list[str] = ["TEMPORARY"]
 
         if dialect is DialectTypes.MSSQL:
@@ -34,11 +72,9 @@ class TempBuilder(SqlBuilder):
         elif dialect is DialectTypes.ORACLE:
             prefixes = ["GLOBAL TEMPORARY"]
         elif global_temp:
-            raise ValueError(
-                f"{dialect} does not support global temporary tables"
-            )
+            raise ValueError(f"{dialect} does not support global temporary tables")
 
-        self._table = clone_table(table, temp_name, prefixes)
+        self._table = sa.Table(temp_name, sa.MetaData(), *columns, prefixes=prefixes)
 
     def _statement(self) -> CreateTable:
         return CreateTable(self._table)
@@ -47,4 +83,3 @@ class TempBuilder(SqlBuilder):
         """Return an :class:`ObjectUnit` over the temporary table, for
         selecting from / inserting into it after :meth:`run`."""
         return ObjectUnit(self._base, self._handler, self._table)
-
