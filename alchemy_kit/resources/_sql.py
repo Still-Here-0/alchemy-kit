@@ -1,7 +1,7 @@
 import re
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Sequence
 
 import sqlalchemy
 
@@ -53,10 +53,12 @@ class SQL:
             return query
 
         parameters: list[str]
-        if isinstance(self.query_parameters, Sequence):
+        if isinstance(self.query_parameters, Mapping):
+            parameters = list(self.query_parameters.keys())
+        elif self.query_parameters:
             parameters = list(self.query_parameters[0].keys())
         else:
-            parameters = list(self.query_parameters.keys())
+            parameters = []
 
         for param in parameters:
             pattern = rf"@{re.escape(param)}\b"
@@ -72,4 +74,3 @@ class SQL:
                 query = re.sub(pattern, value, query)
 
         return query
-

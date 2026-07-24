@@ -1,6 +1,7 @@
 
 import copy
-from typing import TYPE_CHECKING, Any, Iterator, NotRequired, Self, TypedDict, cast
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict, cast
 
 import pandas as pd
 from pandera.api.base.model import MetaModel

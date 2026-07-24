@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, ClassVar, NamedTuple, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import Any, ClassVar, NamedTuple, Protocol, runtime_checkable
 
 import sqlalchemy as sa
 

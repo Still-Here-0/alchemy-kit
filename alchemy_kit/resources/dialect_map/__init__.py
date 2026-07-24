@@ -1,4 +1,5 @@
-from typing import Callable, NamedTuple
+from collections.abc import Callable
+from typing import NamedTuple
 
 from sqlalchemy.dialects import mssql as sa_mssql
 from sqlalchemy.dialects import mysql as sa_mysql

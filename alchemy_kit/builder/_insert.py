@@ -1,4 +1,5 @@
-from typing import Any, Sequence, cast
+from collections.abc import Sequence
+from typing import Any, cast
 
 import pandas as pd
 import sqlalchemy as sa

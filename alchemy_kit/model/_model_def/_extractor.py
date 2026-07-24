@@ -1,6 +1,7 @@
 import re
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 import pandas as pd
 from pandera.typing import DataFrame

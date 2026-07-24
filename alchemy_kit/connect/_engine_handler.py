@@ -1,4 +1,5 @@
-from typing import Literal, Protocol, Sequence, cast
+from collections.abc import Mapping, Sequence
+from typing import Literal, Protocol, cast
 
 import pandas as pd
 import sqlalchemy
@@ -89,9 +90,10 @@ class EngineHandler:
         sql.process_query()
         query = sqlalchemy.text(cast(str, sql.processed_query))
 
-        if isinstance(sql.query_parameters, Sequence):
-            return conn.execute(query, sql.query_parameters)
-        return self._execute_with_binded_parameters(conn, query, sql.query_parameters)
+        if isinstance(sql.query_parameters, Mapping):
+            return self._execute_with_binded_parameters(conn, query, sql.query_parameters)
+
+        return conn.execute(query, sql.query_parameters)
 
     @staticmethod
     def _collect_result(result: sqlalchemy.CursorResult) -> tuple[int | None, pd.DataFrame]:
@@ -134,4 +136,3 @@ class EngineHandler:
                 conn.execute(sqlalchemy.text(f"TRUNCATE TABLE {table_ref}"))
 
             return data.to_sql(table_name, conn, schema=schema_name, if_exists=if_exists, index=False)
-
