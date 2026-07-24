@@ -22,8 +22,8 @@ class SelectBuilder(SqlBuilder):
 
     def __init__(
         self,
-        from_: ObjectUnit[Any],
         *columns: "ColumnUnit[Any] | ObjectUnit[Any]",
+        from_: ObjectUnit[Any],
     ) -> None:
         super().__init__(from_._base, from_._handler)
         self._check_units(from_, *columns)
