@@ -46,7 +46,7 @@ class InsertBuilder(SqlBuilder):
     def _sql_name(self, name: str) -> str:
         sql_name = getattr(self._base, name, name)
         return sql_name if isinstance(sql_name, str) else name
-    
+
     def get_parameters(self) -> dict[str, SqlScalarType] | list[dict[str, SqlScalarType]]:
         """Return the values to insert, keyed by SQL column name: a dict for
         :meth:`from_values`, one dict per row for :meth:`from_dataframe`
