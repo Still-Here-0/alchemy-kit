@@ -1,3 +1,4 @@
+from ._call_unit import CallableUnit
 from ._column_unit import (
     AggregateColumnUnit,
     BooleanColumnUnit,
@@ -11,6 +12,7 @@ from ._operand_unit import OperandUnit
 __all__ = [
     "AggregateColumnUnit",
     "BooleanColumnUnit",
+    "CallableUnit",
     "ColumnUnit",
     "ObjectUnit",
     "OperandUnit",

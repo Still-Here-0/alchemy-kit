@@ -10,6 +10,8 @@ __all__ = [
     "ListUniqueClusters",
     "ListForeignKeys",
     "ListCheckConstraints",
+    "ListProcedures",
+    "ListParameters",
 ]
 
 
@@ -96,3 +98,24 @@ class ListCheckConstraints(BaseModel):
     check_name: Series[str] = Field(nullable=False)
     definition: Series[str] = Field(nullable=False)
     column_name: Series[str] = Field(nullable=True)
+
+
+class ListProcedures(BaseModel):
+    """Schema for the procedure-listing frame (one row per stored procedure)."""
+
+    procedure_name: Series[str] = Field(nullable=False)
+    procedure_description: Series[str] = Field(nullable=True)
+
+
+class ListParameters(BaseModel):
+    """Schema for the parameter-listing frame (one row per procedure parameter).
+
+    ``ordinal`` is the parameter's 1-based position and ``mode`` is one of
+    ``IN``/``OUT``/``INOUT``.
+    """
+
+    parameter_name: Series[str] = Field(nullable=False)
+    sql_type: Series[str] = Field(nullable=False)
+    is_nullable: Series[bool] = Field(nullable=False)
+    mode: Series[str] = Field(nullable=False)
+    ordinal: Series[int] = Field(nullable=False)

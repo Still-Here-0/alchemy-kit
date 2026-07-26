@@ -1,0 +1,27 @@
+# --------------------------------------------------------------------------------
+# AUTO-GENERATED FILE - DO NOT EDIT
+#
+# This file was generated automatically by alchemy_kit.
+# Any manual changes will be overwritten the next time it is regenerated.
+#
+# To update this file, modify the source database and re-run the builder script.
+#
+# --------------------------------------------------------------------------------
+
+from {callable_model_module} import CallableModel
+from {engine_handler_module} import EngineHandler
+from {call_unit_module} import CallableUnit
+from {sql_module} import SQL
+from {type_parameters_module} import {type_parameters}
+from pandas import DataFrame
+from datetime import datetime, date
+from typing import Optional, Any
+
+class {class_name}(CallableModel[{type_parameters}]):
+    @classmethod
+    def _get_unit(cls, handler: EngineHandler) -> {class_name}_Unit: ...
+
+class {class_name}_Unit(CallableUnit[{type_parameters}]):
+    def run(self:params) -> tuple[int | None, DataFrame]: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+    def to_sql(self:params) -> SQL: ...  # pyright: ignore[reportIncompatibleMethodOverride]
+    def render(self:params) -> str: ...  # pyright: ignore[reportIncompatibleMethodOverride]

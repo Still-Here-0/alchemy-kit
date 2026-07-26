@@ -1,7 +1,7 @@
 
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -13,12 +13,15 @@ from ._model.column_model import ColumnModel, ForeignKeyModel
 from ._model.constraint_model import CheckConstraintModel, FilteredUniqueIndexModel, ForeignKeyConstraintModel
 from ._model.db_model import DBModel
 from ._model.object_model import ObjectModel
+from ._model.procedure_model import ParameterModel, ParameterMode, ProcedureModel
 from ._model.schema_model import SchemaModel
 from ._model_def import (
     ListCheckConstraints,
     ListColumns,
     ListForeignKeys,
     ListObjects,
+    ListParameters,
+    ListProcedures,
     ListSchemas,
     ListUniqueClusters,
     MetadataExtractor,
@@ -125,6 +128,26 @@ def parse_db(conn_info: ConnectionInfo, schema_conf: SchemaConfig, logger: Bette
                         column=none_if_na(row[ListCheckConstraints.column_name]),
                     )
                     sql_object.check_constraints[check.name] = check
+
+            procedure_data = extractor.list_procedures(schema_conf, schema_name)
+            for _, row in procedure_data.iterrows():
+                procedure_name: str = row[ListProcedures.procedure_name]
+                procedure = ProcedureModel(
+                    name=procedure_name,
+                    description=none_if_na(row[ListProcedures.procedure_description]),
+                )
+                sql_schema.callables[procedure_name] = procedure
+
+                parameter_data = extractor.list_parameters(schema_name, procedure_name)
+                for _, row in parameter_data.iterrows():
+                    parameter = ParameterModel(
+                        name=row[ListParameters.parameter_name],
+                        parameter_type=row[ListParameters.sql_type],
+                        is_nullable=bool(row[ListParameters.is_nullable]),
+                        mode=cast(ParameterMode, row[ListParameters.mode]),
+                        ordinal=int(row[ListParameters.ordinal]),
+                    )
+                    procedure.add_parameter(parameter)
 
     return db
 

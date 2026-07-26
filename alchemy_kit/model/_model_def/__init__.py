@@ -4,6 +4,8 @@ from ._frames import (
     ListColumns,
     ListForeignKeys,
     ListObjects,
+    ListParameters,
+    ListProcedures,
     ListSchemas,
     ListUniqueClusters,
 )
@@ -14,6 +16,8 @@ __all__ = [
     "ListColumns",
     "ListForeignKeys",
     "ListObjects",
+    "ListParameters",
+    "ListProcedures",
     "ListSchemas",
     "ListUniqueClusters",
 ]

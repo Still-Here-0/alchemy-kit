@@ -16,16 +16,23 @@ class Identifiers:
     # Python keywords, builtins, and names the generated templates depend on.
     _RESERVED_PY_NAMES: frozenset[str] = frozenset(
         set(keyword.kwlist) | set(keyword.softkwlist) | set(dir(builtins)) | {
+            # method receiver
+            "self",
+
             # base model
-            "get_unit", "Meta", "Config", "BaseModel", "validate", 
+            "get_unit", "Meta", "Config", "BaseModel", "validate",
             "strip_timezone",
 
             # imports
             "Optional", "Any", "Decimal", "pa",  "init", "date",
-            "Series", "datetime",
+            "Series", "datetime", "SQL", "DataFrame",
+            "CallableModel", "CallableUnit", "EngineHandler",
 
             # object unit
             "get_metadata", "set_alias",
+
+            # callable unit
+            "run", "to_sql", "render",
         }
     )
 

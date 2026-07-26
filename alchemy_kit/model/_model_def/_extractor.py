@@ -18,9 +18,18 @@ from ._frames import (
     ListColumns,
     ListForeignKeys,
     ListObjects,
+    ListParameters,
+    ListProcedures,
     ListSchemas,
     ListUniqueClusters,
 )
+
+_INFO_SCHEMA_ROUTINE_DIALECTS: frozenset[DialectTypes] = frozenset({
+    DialectTypes.MSSQL,
+    DialectTypes.MYSQL,
+    DialectTypes.MARIADB,
+    DialectTypes.POSTGRESQL,
+})
 
 _SYSTEM_SCHEMAS: dict[DialectTypes, frozenset[str]] = {
     DialectTypes.MSSQL: frozenset({"information_schema", "sys", "guest"}),
@@ -245,6 +254,84 @@ class MetadataExtractor:
 
         df = pd.DataFrame(rows, columns=["check_name", "definition", "column_name"])
         return ListCheckConstraints.validate(df)
+
+    def list_procedures(self, schema_conf: SchemaConfig, schema_name: str) -> DataFrame[ListProcedures]:
+        include = schema_conf._include.get(schema_name)
+        exclude = schema_conf._exclude.get(schema_name)
+
+        rows = []
+        for name in self._reflect_procedure_names(schema_name):
+            if include and name not in include:
+                continue
+            if exclude and name in exclude:
+                continue
+
+            rows.append({
+                "procedure_name": name,
+                "procedure_description": None,
+            })
+
+        df = pd.DataFrame(rows, columns=["procedure_name", "procedure_description"])
+        return ListProcedures.validate(df)
+
+    def list_parameters(self, schema_name: str, procedure_name: str) -> DataFrame[ListParameters]:
+        rows = []
+        for parameter in self._reflect_parameters(schema_name, procedure_name):
+            rows.append({
+                "parameter_name": parameter["name"],
+                "sql_type": parameter["sql_type"],
+                "is_nullable": parameter["is_nullable"],
+                "mode": parameter["mode"],
+                "ordinal": parameter["ordinal"],
+            })
+
+        df = pd.DataFrame(rows, columns=[
+            "parameter_name", "sql_type", "is_nullable", "mode", "ordinal",
+        ])
+        return ListParameters.validate(df)
+
+    def _reflect_procedure_names(self, schema_name: str) -> list[str]:
+        if self._dialect not in _INFO_SCHEMA_ROUTINE_DIALECTS:
+            return []
+
+        sql = SQL(
+            raw_query=(
+                "SELECT routine_name FROM information_schema.routines"
+                " WHERE routine_schema = :schema_name AND routine_type = 'PROCEDURE'"
+            ),
+            query_parameters={"schema_name": schema_name},
+        )
+        _, data = self._handler.run_sql(sql)
+        if data.empty:
+            return []
+        return [str(name) for name in data.iloc[:, 0].tolist()]
+
+    def _reflect_parameters(self, schema_name: str, procedure_name: str) -> list[dict[str, Any]]:
+        if self._dialect not in _INFO_SCHEMA_ROUTINE_DIALECTS:
+            return []
+
+        sql = SQL(
+            raw_query=(
+                "SELECT parameter_name, data_type, ordinal_position, parameter_mode"
+                " FROM information_schema.parameters"
+                " WHERE specific_schema = :schema_name AND specific_name = :procedure_name"
+                " AND parameter_name IS NOT NULL"
+                " ORDER BY ordinal_position"
+            ),
+            query_parameters={"schema_name": schema_name, "procedure_name": procedure_name},
+        )
+        _, data = self._handler.run_sql(sql)
+
+        return [
+            {
+                "name": str(row.parameter_name),
+                "sql_type": str(row.data_type),
+                "is_nullable": False,
+                "mode": (str(row.parameter_mode) or "IN").upper(),
+                "ordinal": row.ordinal_position,
+            }
+            for row in data.itertuples(index=False)
+        ]
 
     def _is_system_schema(self, name: str) -> bool:
         lowered = name.lower()

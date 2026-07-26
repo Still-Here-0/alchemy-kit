@@ -1,0 +1,17 @@
+# --------------------------------------------------------------------------------
+# AUTO-GENERATED FILE - DO NOT EDIT
+#
+# This file was generated automatically by alchemy_kit.
+# Any manual changes will be overwritten the next time it is regenerated.
+#
+# To update this file, modify the source database and re-run the builder script.
+#
+# --------------------------------------------------------------------------------
+
+from {callable_model_module} import CallableModel, CallMetaData
+from {type_parameters_module} import {type_parameters}
+
+class {class_name}(CallableModel[{type_parameters}]):
+
+    class Config(CallableModel.Config):
+        {metadata}
