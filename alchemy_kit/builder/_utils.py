@@ -5,11 +5,20 @@ import sqlalchemy as sa
 from pandas.api import types as pdt
 
 from ..model.base_model import BaseModel
+from ..model.units import ObjectUnit
 
 
 class DataFrameTemp(BaseModel):
     """Placeholder base for temp tables built from a raw DataFrame, whose
     column names are their own SQL names."""
+
+
+def plain_table(target: ObjectUnit[Any], operation: str) -> sa.Table:
+    """Return the target's underlying table, rejecting aliased object units."""
+    selectable = target._selectable
+    if not isinstance(selectable, sa.Table):
+        raise TypeError(f"{operation} target must be a plain object unit, not an aliased one")
+    return selectable
 
 
 def sa_type_from_series(series: pd.Series) -> sa.types.TypeEngine[Any]:
