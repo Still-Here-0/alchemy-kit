@@ -37,6 +37,9 @@ dev = [
     "pytest>=9.1.0",
 ]
 
+[tool.pytest.ini_options]
+markers = ["local: needs a local database connection, run with --run-local"]
+
 [tool.importlinter]
 root_package = "alchemy_kit"
 

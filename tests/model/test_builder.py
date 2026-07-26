@@ -1,4 +1,3 @@
-from inspect import isgenerator
 import shutil
 from pathlib import Path
 from typing import cast
@@ -121,6 +120,7 @@ def test_build_generates_package(monkeypatch: pytest.MonkeyPatch):
     for path in result_dir.rglob("*.py*"):
         compile(path.read_text(), str(path), "exec")
 
+@pytest.mark.local
 def test_mssql_local_build():
     conn = info_builder.from_env(ROOT/".env-mssql")
     config = SchemaConfig()
