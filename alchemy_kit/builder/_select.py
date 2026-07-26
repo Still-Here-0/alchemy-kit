@@ -165,3 +165,8 @@ class SelectBuilder(SqlBuilder):
         an ``order_by``)."""
         return self._with(self._stmt.offset(count))
 
+    def paginate(self, page: int, size: int) -> "SelectBuilder":
+        """Return page ``page`` (1-based) of ``size`` rows, setting ``limit``
+        and ``offset`` together; pair with an ``order_by`` for stable pages."""
+        return self._with(self._stmt.limit(size).offset((page - 1) * size))
+
