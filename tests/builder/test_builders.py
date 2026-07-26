@@ -773,3 +773,34 @@ def test_from_subquery_join_runs(handler: EngineHandler):
     )
     assert df["name"].tolist() == ["nut"]
     assert df["label"].tolist() == ["gear"]
+
+
+def test_paginate_compiles_limit_and_offset():
+    i = SQLITE_HANDLER.get_unit(items)
+    sql = SelectBuilder(i.name, from_=i).order_by(i.id_1).paginate(3, 20).to_sql()
+
+    assert sql.raw_query is not None
+    assert "LIMIT" in sql.raw_query
+    assert "OFFSET" in sql.raw_query
+
+    params = sql.query_parameters
+    assert isinstance(params, dict)
+    assert 20 in params.values()
+    assert 40 in params.values()
+
+
+def test_paginate_runs(handler: EngineHandler):
+    items_tmp = TempBuilder(handler.get_unit(items))
+    items_tmp.run()
+
+    t = items_tmp.unit()
+    for id_1, name in enumerate(["a", "b", "c", "d", "e"], start=1):
+        InsertBuilder(t).from_values(id_1=id_1, name=name, price=float(id_1)).run()
+
+    def page(number: int) -> list[str]:
+        _, df = SelectBuilder(t.name, from_=t).order_by(t.id_1).paginate(number, 2).run()
+        return df["name"].tolist()
+
+    assert page(1) == ["a", "b"]
+    assert page(2) == ["c", "d"]
+    assert page(3) == ["e"]
