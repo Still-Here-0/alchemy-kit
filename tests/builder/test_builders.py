@@ -69,7 +69,7 @@ def test_every_dialect_compiles_with_named_paramstyle():
 def test_select_render_and_parameters():
     i = SQLITE_HANDLER.get_unit(items)
     builder = (
-        SelectBuilder(i, i.name, i.price.sum().set_alias("total"))
+        SelectBuilder(i.name, i.price.sum().set_alias("total"), from_=i)
         .where(i.price > 1)
         .group_by(i.name)
         .having(i.price.sum() > 2)
@@ -87,7 +87,7 @@ def test_select_render_and_parameters():
 
 def test_select_builder_is_immutable():
     i = SQLITE_HANDLER.get_unit(items)
-    base = SelectBuilder(i, i.name)
+    base = SelectBuilder(i.name, from_=i)
     filtered = base.where(i.price > 1)
 
     assert "WHERE" not in base.render()
@@ -99,13 +99,13 @@ def test_mixing_engine_handlers_raises(handler: EngineHandler):
     o = SQLITE_HANDLER.get_unit(items)
 
     with pytest.raises(ValueError):
-        SelectBuilder(i, i.name, o.id_1)
+        SelectBuilder(i.name, o.id_1, from_=i)
     with pytest.raises(ValueError):
-        SelectBuilder(i, i.name).where(o.price > 1)
+        SelectBuilder(i.name, from_=i).where(o.price > 1)
     with pytest.raises(ValueError):
-        SelectBuilder(i, i.name).order_by(o.price.desc())
+        SelectBuilder(i.name, from_=i).order_by(o.price.desc())
     with pytest.raises(ValueError):
-        InsertBuilder(handler.get_unit(items)).from_select(SelectBuilder(o, o.id_1))
+        InsertBuilder(handler.get_unit(items)).from_select(SelectBuilder(o.id_1, from_=o))
 
 
 def test_cross_join_compiles_and_runs(handler: EngineHandler):
@@ -116,7 +116,7 @@ def test_cross_join_compiles_and_runs(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=2, name="nut", price=1.5).run()
 
     o = tmp.unit().set_alias("o")
-    builder = SelectBuilder(t, t.name, o.price).join("CROSS", o)
+    builder = SelectBuilder(t.name, o.price, from_=t).join("CROSS", o)
     assert "ON 1 = 1" in builder.render()
 
     _, df = builder.run()
@@ -134,7 +134,7 @@ def test_right_join_keeps_unmatched_right_rows(handler: EngineHandler):
     InsertBuilder(p).from_values(id_1=1, label="washer").run()
     InsertBuilder(p).from_values(id_1=2, label="nut").run()
 
-    builder = SelectBuilder(t, t.name, p.id_1).join("RIGHT", p, t.id_1 == p.id_1)
+    builder = SelectBuilder(t.name, p.id_1, from_=t).join("RIGHT", p, t.id_1 == p.id_1)
     assert "LEFT OUTER JOIN" in builder.render()
 
     _, df = builder.run()
@@ -155,7 +155,7 @@ def test_joins_chain_after_right(handler: EngineHandler):
 
     third = parts_tmp.unit().set_alias("third")
     builder = (
-        SelectBuilder(t, t.name, p.id_1)
+        SelectBuilder(t.name, p.id_1, from_=t)
         .join("RIGHT", p, t.id_1 == p.id_1)
         .join("INNER", third, p.id_1 == third.id_1)
     )
@@ -170,9 +170,9 @@ def test_join_condition_arity():
     i = SQLITE_HANDLER.get_unit(items)
     o = SQLITE_HANDLER.get_unit(items).set_alias("o")
     with pytest.raises(TypeError):
-        SelectBuilder(i, i.name).join("CROSS", o, i.id_1 == o.id_1)
+        SelectBuilder(i.name, from_=i).join("CROSS", o, i.id_1 == o.id_1)
     with pytest.raises(TypeError):
-        SelectBuilder(i, i.name).join("INNER", o)
+        SelectBuilder(i.name, from_=i).join("INNER", o)
 
 
 def test_insert_to_sqls_chunks_and_runs_with_temp_table(handler: EngineHandler):
@@ -189,7 +189,7 @@ def test_insert_to_sqls_chunks_and_runs_with_temp_table(handler: EngineHandler):
     results = handler.run_sqls([
         tmp.to_sql(),
         *insert_sqls,
-        SelectBuilder(tmp.unit(), tmp.unit().name).to_sql(),
+        SelectBuilder(tmp.unit().name, from_=tmp.unit()).to_sql(),
     ])
 
     assert sorted(results[-1][1]["name"].tolist()) == ["bolt", "gear", "nut"]
@@ -227,18 +227,18 @@ def test_temp_round_trip_through_run_sql(handler: EngineHandler):
     ]:
         InsertBuilder(t).from_values(**row).run()
 
-    _, df = SelectBuilder(t, t.name, t.price).where(t.price > 1).order_by(t.price.desc()).run()
+    _, df = SelectBuilder(t.name, t.price, from_=t).where(t.price > 1).order_by(t.price.desc()).run()
     assert df["name"].tolist() == ["gear", "nut"]
 
     handler.run_sql(SQL(raw_query="CREATE TABLE main.items (id INTEGER NOT NULL, name VARCHAR NOT NULL, price REAL)"))
     moved, _ = (
         InsertBuilder(handler.get_unit(items))
-        .from_select(SelectBuilder(t, t.id_1, t.name, t.price).where(t.price > 1))
+        .from_select(SelectBuilder(t.id_1, t.name, t.price, from_=t).where(t.price > 1))
         .run()
     )
     assert moved == 2
 
-    _, real = SelectBuilder(handler.get_unit(items)).run()
+    _, real = SelectBuilder(from_=handler.get_unit(items)).run()
     assert sorted(real["name"].tolist()) == ["gear", "nut"]
 
 
@@ -305,7 +305,7 @@ def test_from_dataframe_round_trip(handler: EngineHandler):
     t = tmp.unit()
     InsertBuilder(t).from_dataframe(df).run()
 
-    _, out = SelectBuilder(t, t.a, t.b, t.c).where(t.c > 1).run()
+    _, out = SelectBuilder(t.a, t.b, t.c, from_=t).where(t.c > 1).run()
     assert out["b"].tolist() == ["nut"]
     assert out["a"].tolist() == [2]
 
@@ -322,7 +322,7 @@ def test_from_dataframe_base_resolves_model_field_names(handler: EngineHandler):
     t = tmp.unit()
     InsertBuilder(t).from_dataframe(df).run()
 
-    _, out = SelectBuilder(t, t.name, t.price).where(t.price > 1).order_by(t.id_1).run()
+    _, out = SelectBuilder(t.name, t.price, from_=t).where(t.price > 1).order_by(t.id_1).run()
     assert out["name"].tolist() == ["nut"]
 
 
@@ -356,13 +356,13 @@ def test_null_safe_comparisons(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=1, name="bolt", price=0.5).run()
     InsertBuilder(t).from_values(id_1=2, name="nut", price=None).run()
 
-    _, df = SelectBuilder(t, t.name).where(t.price != 0.5).run()
+    _, df = SelectBuilder(t.name, from_=t).where(t.price != 0.5).run()
     assert df["name"].tolist() == []
 
-    _, df = SelectBuilder(t, t.name).where(t.price.is_distinct_from(0.5)).run()
+    _, df = SelectBuilder(t.name, from_=t).where(t.price.is_distinct_from(0.5)).run()
     assert df["name"].tolist() == ["nut"]
 
-    _, df = SelectBuilder(t, t.name).where(t.price.is_not_distinct_from(None)).run()
+    _, df = SelectBuilder(t.name, from_=t).where(t.price.is_not_distinct_from(None)).run()
     assert df["name"].tolist() == ["nut"]
 
 
@@ -373,7 +373,7 @@ def test_nullif_guards_division(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=1, name="free", price=0.0).run()
     InsertBuilder(t).from_values(id_1=2, name="dear", price=2.0).run()
 
-    _, df = SelectBuilder(t, t.name, (10 / t.price.nullif(0)).set_alias("ratio")).run()
+    _, df = SelectBuilder(t.name, (10 / t.price.nullif(0)).set_alias("ratio"), from_=t).run()
     by_name = dict(zip(df["name"], df["ratio"]))
     assert by_name["free"] is None or by_name["free"] != by_name["free"]
     assert by_name["dear"] == 5.0
@@ -385,12 +385,7 @@ def test_floor_division(handler: EngineHandler):
     t = tmp.unit()
     InsertBuilder(t).from_values(id_1=7, name="bolt", price=4.5).run()
 
-    builder = SelectBuilder(
-        t,
-        (t.id_1 // 2).set_alias("half"),
-        (100 // t.id_1).set_alias("inverse"),
-        (t.price // 2).set_alias("floored"),
-    )
+    builder = SelectBuilder((t.id_1 // 2).set_alias("half"), (100 // t.id_1).set_alias("inverse"), (t.price // 2).set_alias("floored"), from_=t)
     assert "FLOOR" in builder.render()
 
     _, df = builder.run()
@@ -405,13 +400,7 @@ def test_string_operations(handler: EngineHandler):
     t = tmp.unit()
     InsertBuilder(t).from_values(id_1=1, name="  Bolt  ", price=0.5).run()
 
-    _, df = SelectBuilder(
-        t,
-        t.name.trim().lower().set_alias("clean"),
-        t.name.trim().upper().set_alias("loud"),
-        t.name.trim().length().set_alias("size"),
-        t.name.trim().concat("-", t.name.trim()).set_alias("doubled"),
-    ).run()
+    _, df = SelectBuilder(t.name.trim().lower().set_alias("clean"), t.name.trim().upper().set_alias("loud"), t.name.trim().length().set_alias("size"), t.name.trim().concat("-", t.name.trim()).set_alias("doubled"), from_=t).run()
 
     assert df["clean"].tolist() == ["bolt"]
     assert df["loud"].tolist() == ["BOLT"]
@@ -427,13 +416,13 @@ def test_ordering_unit_null_placement(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=2, name="nut", price=None).run()
     InsertBuilder(t).from_values(id_1=3, name="gear", price=0.5).run()
 
-    builder = SelectBuilder(t, t.name).order_by(t.price.desc().nulls_last())
+    builder = SelectBuilder(t.name, from_=t).order_by(t.price.desc().nulls_last())
     assert "NULLS LAST" in builder.render()
 
     _, df = builder.run()
     assert df["name"].tolist() == ["bolt", "gear", "nut"]
 
-    _, df = SelectBuilder(t, t.name).order_by(t.price.asc().nulls_first()).run()
+    _, df = SelectBuilder(t.name, from_=t).order_by(t.price.asc().nulls_first()).run()
     assert df["name"].tolist() == ["nut", "gear", "bolt"]
 
 
@@ -453,9 +442,7 @@ def test_window_running_total(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=2, name="nut", price=25.0).run()
     InsertBuilder(t).from_values(id_1=3, name="gear", price=5.0).run()
 
-    builder = SelectBuilder(
-        t, t.name, t.price.sum().over(order_by=t.id_1.asc()).set_alias("running")
-    ).order_by(t.id_1)
+    builder = SelectBuilder(t.name, t.price.sum().over(order_by=t.id_1.asc()).set_alias("running"), from_=t).order_by(t.id_1)
     assert "OVER (ORDER BY" in builder.render()
 
     _, df = builder.run()
@@ -470,9 +457,7 @@ def test_window_partition(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=2, name="bolt", price=2.0).run()
     InsertBuilder(t).from_values(id_1=3, name="nut", price=5.0).run()
 
-    builder = SelectBuilder(
-        t, t.name, (t.price / t.price.sum().over(partition_by=t.name)).set_alias("share")
-    ).order_by(t.id_1)
+    builder = SelectBuilder(t.name, (t.price / t.price.sum().over(partition_by=t.name)).set_alias("share"), from_=t).order_by(t.id_1)
     assert "OVER (PARTITION BY" in builder.render()
 
     _, df = builder.run()
@@ -487,13 +472,9 @@ def test_window_row_number_per_group(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=2, name="bolt", price=2.0).run()
     InsertBuilder(t).from_values(id_1=3, name="nut", price=5.0).run()
 
-    _, df = SelectBuilder(
-        t,
-        t.name,
-        OperandUnit.row_number()
+    _, df = SelectBuilder(t.name, OperandUnit.row_number()
         .over(partition_by=t.name, order_by=t.price.desc())
-        .set_alias("rn"),
-    ).order_by(t.id_1).run()
+        .set_alias("rn"), from_=t).order_by(t.id_1).run()
 
     assert df["rn"].tolist() == [2, 1, 1]
 
@@ -505,14 +486,7 @@ def test_operand_rankings(handler: EngineHandler):
     for row_id, price in [(1, 10.0), (2, 10.0), (3, 20.0)]:
         InsertBuilder(t).from_values(id_1=row_id, name="bolt", price=price).run()
 
-    _, df = SelectBuilder(
-        t,
-        t.id_1,
-        OperandUnit.rank().over(order_by=t.price.asc()).set_alias("rnk"),
-        OperandUnit.dense_rank().over(order_by=t.price.asc()).set_alias("dense"),
-        OperandUnit.percent_rank().over(order_by=t.price.asc()).set_alias("pct"),
-        OperandUnit.cume_dist().over(order_by=t.price.asc()).set_alias("cume"),
-    ).order_by(t.id_1).run()
+    _, df = SelectBuilder(t.id_1, OperandUnit.rank().over(order_by=t.price.asc()).set_alias("rnk"), OperandUnit.dense_rank().over(order_by=t.price.asc()).set_alias("dense"), OperandUnit.percent_rank().over(order_by=t.price.asc()).set_alias("pct"), OperandUnit.cume_dist().over(order_by=t.price.asc()).set_alias("cume"), from_=t).order_by(t.id_1).run()
 
     assert df["rnk"].tolist() == [1, 1, 3]
     assert df["dense"].tolist() == [1, 1, 2]
@@ -527,11 +501,7 @@ def test_operand_ntile(handler: EngineHandler):
     for row_id in range(1, 5):
         InsertBuilder(t).from_values(id_1=row_id, name="bolt", price=float(row_id)).run()
 
-    _, df = SelectBuilder(
-        t,
-        t.id_1,
-        OperandUnit.ntile(2).over(order_by=t.price.asc()).set_alias("bucket"),
-    ).order_by(t.id_1).run()
+    _, df = SelectBuilder(t.id_1, OperandUnit.ntile(2).over(order_by=t.price.asc()).set_alias("bucket"), from_=t).order_by(t.id_1).run()
 
     assert df["bucket"].tolist() == [1, 1, 2, 2]
 
@@ -543,11 +513,7 @@ def test_operand_count_star_in_first_position(handler: EngineHandler):
     for row_id in range(1, 4):
         InsertBuilder(t).from_values(id_1=row_id, name="bolt", price=1.0).run()
 
-    builder = SelectBuilder(
-        t,
-        OperandUnit.count().over().set_alias("total"),
-        t.name,
-    ).order_by(t.id_1)
+    builder = SelectBuilder(OperandUnit.count().over().set_alias("total"), t.name, from_=t).order_by(t.id_1)
     assert "count(*) OVER" in builder.render()
 
     _, df = builder.run()
@@ -557,8 +523,8 @@ def test_operand_count_star_in_first_position(handler: EngineHandler):
 def test_operand_current_timestamp_is_portable(handler: EngineHandler):
     si = handler.get_unit(items)
     mi = MSSQL_HANDLER.get_unit(mssql_items)
-    on_sqlite = SelectBuilder(si, si.id_1, OperandUnit.current_timestamp().set_alias("now"))
-    on_mssql = SelectBuilder(mi, mi.id_1, OperandUnit.current_timestamp().set_alias("now"))
+    on_sqlite = SelectBuilder(si.id_1, OperandUnit.current_timestamp().set_alias("now"), from_=si)
+    on_mssql = SelectBuilder(mi.id_1, OperandUnit.current_timestamp().set_alias("now"), from_=mi)
     assert "CURRENT_TIMESTAMP" in on_sqlite.render()
     assert "CURRENT_TIMESTAMP" in on_mssql.render()
 
@@ -566,20 +532,16 @@ def test_operand_current_timestamp_is_portable(handler: EngineHandler):
     tmp.run()
     t = tmp.unit()
     InsertBuilder(t).from_values(id_1=1, name="bolt", price=1.0).run()
-    _, df = SelectBuilder(t, t.id_1, OperandUnit.current_timestamp().set_alias("now")).run()
+    _, df = SelectBuilder(t.id_1, OperandUnit.current_timestamp().set_alias("now"), from_=t).run()
     assert df["now"].notna().all()
 
 
 def test_operand_current_date_unsupported_on_mssql():
     si = SQLITE_HANDLER.get_unit(items)
     mi = MSSQL_HANDLER.get_unit(mssql_items)
-    assert "CURRENT_DATE" in SelectBuilder(
-        si, si.id_1, OperandUnit.current_date().set_alias("d")
-    ).render()
+    assert "CURRENT_DATE" in SelectBuilder(si.id_1, OperandUnit.current_date().set_alias("d"), from_=si).render()
     with pytest.raises(ValueError):
-        SelectBuilder(
-            mi, mi.id_1, OperandUnit.current_date().set_alias("d")
-        ).render()
+        SelectBuilder(mi.id_1, OperandUnit.current_date().set_alias("d"), from_=mi).render()
 
 
 def test_operand_niladic_dialect_matrix():
@@ -618,12 +580,7 @@ def test_window_lag(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=1, name="bolt", price=10.0).run()
     InsertBuilder(t).from_values(id_1=2, name="nut", price=25.0).run()
 
-    _, df = SelectBuilder(
-        t,
-        t.name,
-        (t.price - t.price.lag().over(order_by=t.id_1.asc())).set_alias("change"),
-        t.price.lag(1, default=0.0).over(order_by=t.id_1.asc()).set_alias("previous"),
-    ).order_by(t.id_1).run()
+    _, df = SelectBuilder(t.name, (t.price - t.price.lag().over(order_by=t.id_1.asc())).set_alias("change"), t.price.lag(1, default=0.0).over(order_by=t.id_1.asc()).set_alias("previous"), from_=t).order_by(t.id_1).run()
 
     assert df["change"].isna().tolist() == [True, False]
     assert df["change"].tolist()[1] == 15.0
@@ -637,9 +594,7 @@ def test_window_frame(handler: EngineHandler):
     for row_id, price in [(1, 2.0), (2, 4.0), (3, 12.0)]:
         InsertBuilder(t).from_values(id_1=row_id, name="bolt", price=price).run()
 
-    builder = SelectBuilder(
-        t, t.price.avg().over(order_by=t.id_1.asc(), rows=(-1, 0)).set_alias("moving")
-    ).order_by(t.id_1)
+    builder = SelectBuilder(t.price.avg().over(order_by=t.id_1.asc(), rows=(-1, 0)).set_alias("moving"), from_=t).order_by(t.id_1)
     assert "PRECEDING AND CURRENT ROW" in builder.render()
 
     _, df = builder.run()
@@ -668,7 +623,7 @@ def test_is_in_parses_null(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=2, name="nut", price=None).run()
     InsertBuilder(t).from_values(id_1=3, name="gear", price=9.0).run()
 
-    builder = SelectBuilder(t, t.name).where(t.price.is_in([0.5, None]))
+    builder = SelectBuilder(t.name, from_=t).where(t.price.is_in([0.5, None]))
     rendered = builder.render()
     assert "IS NULL" in rendered and "OR" in rendered
 
@@ -684,10 +639,10 @@ def test_not_in_parses_null(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=2, name="nut", price=None).run()
     InsertBuilder(t).from_values(id_1=3, name="gear", price=9.0).run()
 
-    _, df = SelectBuilder(t, t.name).where(t.price.not_in([0.5, None])).run()
+    _, df = SelectBuilder(t.name, from_=t).where(t.price.not_in([0.5, None])).run()
     assert df["name"].tolist() == ["gear"]
 
-    _, raw = SelectBuilder(t, t.name).where(t.price.not_in([0.5, None], parse_null=False)).run()
+    _, raw = SelectBuilder(t.name, from_=t).where(t.price.not_in([0.5, None], parse_null=False)).run()
     assert raw["name"].tolist() == []
 
 
@@ -698,7 +653,7 @@ def test_is_in_with_only_null(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=1, name="bolt", price=0.5).run()
     InsertBuilder(t).from_values(id_1=2, name="nut", price=None).run()
 
-    builder = SelectBuilder(t, t.name).where(t.price.is_in([None]))
+    builder = SelectBuilder(t.name, from_=t).where(t.price.is_in([None]))
     rendered = builder.render()
     assert "IS NULL" in rendered and "IN" not in rendered.replace("IS NULL", "")
 
@@ -713,7 +668,7 @@ def test_is_in_raw_null(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=1, name="bolt", price=0.5).run()
     InsertBuilder(t).from_values(id_1=2, name="nut", price=None).run()
 
-    builder = SelectBuilder(t, t.name).where(t.price.is_in([0.5, None], parse_null=False))
+    builder = SelectBuilder(t.name, from_=t).where(t.price.is_in([0.5, None], parse_null=False))
     assert "IS NULL" not in builder.render()
 
     _, df = builder.run()
@@ -727,7 +682,7 @@ def test_deferred_parameter_override(handler: EngineHandler):
     InsertBuilder(t).from_values(id_1=1, name="cheap", price=1.0).run()
     InsertBuilder(t).from_values(id_1=2, name="dear", price=9.0).run()
 
-    builder = SelectBuilder(t, t.name).where(t.price > 1)
+    builder = SelectBuilder(t.name, from_=t).where(t.price > 1)
     _, df = builder.run(price_1=8)
     assert df["name"].tolist() == ["dear"]
 
@@ -736,13 +691,13 @@ def test_scalar_subquery_renders_top_on_mssql():
     m = MSSQL_HANDLER.get_unit(mssql_items)
     sub = MSSQL_HANDLER.get_unit(mssql_items).set_alias("sub")
     latest = (
-        SelectBuilder(sub, sub.id_1)
+        SelectBuilder(sub.id_1, from_=sub)
         .order_by(sub.id_1.desc())
         .limit(1)
         .as_scalar()
         .set_alias("latest")
     )
-    rendered = SelectBuilder(m, m.id_1, latest).render()
+    rendered = SelectBuilder(m.id_1, latest, from_=m).render()
     assert "TOP 1" in rendered
     assert "latest" in rendered
 
@@ -750,8 +705,8 @@ def test_scalar_subquery_renders_top_on_mssql():
 def test_scalar_subquery_renders_limit_on_sqlite():
     i = SQLITE_HANDLER.get_unit(items)
     sub = SQLITE_HANDLER.get_unit(items).set_alias("sub")
-    latest = SelectBuilder(sub, sub.id_1).order_by(sub.id_1.desc()).limit(1).as_scalar()
-    rendered = SelectBuilder(i, i.name, latest).render()
+    latest = SelectBuilder(sub.id_1, from_=sub).order_by(sub.id_1.desc()).limit(1).as_scalar()
+    rendered = SelectBuilder(i.name, latest, from_=i).render()
     assert "LIMIT" in rendered
     assert "TOP" not in rendered
 
@@ -760,9 +715,9 @@ def test_scalar_subquery_correlates_on_outer_column():
     i = SQLITE_HANDLER.get_unit(items)
     p = SQLITE_HANDLER.get_unit(parts)
     label = (
-        SelectBuilder(p, p.label).where(p.id_1 == i.id_1).limit(1).as_scalar().set_alias("label")
+        SelectBuilder(p.label, from_=p).where(p.id_1 == i.id_1).limit(1).as_scalar().set_alias("label")
     )
-    rendered = SelectBuilder(i, i.name, label).render()
+    rendered = SelectBuilder(i.name, label, from_=i).render()
     assert rendered.count("FROM main.items") == 1
     assert "FROM main.parts" in rendered
 
@@ -780,17 +735,17 @@ def test_scalar_subquery_runs(handler: EngineHandler):
     InsertBuilder(p).from_values(id_1=2, label="gear").run()
 
     label = (
-        SelectBuilder(p, p.label).where(p.id_1 == t.id_1).limit(1).as_scalar().set_alias("label")
+        SelectBuilder(p.label, from_=p).where(p.id_1 == t.id_1).limit(1).as_scalar().set_alias("label")
     )
-    _, df = SelectBuilder(t, t.name, label).order_by(t.id_1).run()
+    _, df = SelectBuilder(t.name, label, from_=t).order_by(t.id_1).run()
     assert df["label"].tolist() == ["washer", "gear"]
 
 
 def test_from_subquery_join_renders_derived_table():
     i = SQLITE_HANDLER.get_unit(items)
     p = SQLITE_HANDLER.get_unit(parts)
-    active = SelectBuilder(p, p).where(p.id_1 > 1).as_object("p")
-    rendered = SelectBuilder(i, i.name, active.label).join(
+    active = SelectBuilder(p, from_=p).where(p.id_1 > 1).as_object("p")
+    rendered = SelectBuilder(i.name, active.label, from_=i).join(
         "INNER", active, i.id_1 == active.id_1
     ).render()
     assert "JOIN (SELECT" in rendered
@@ -810,9 +765,9 @@ def test_from_subquery_join_runs(handler: EngineHandler):
     InsertBuilder(p).from_values(id_1=1, label="washer").run()
     InsertBuilder(p).from_values(id_1=2, label="gear").run()
 
-    active = SelectBuilder(p, p).where(p.id_1 > 1).as_object("p")
+    active = SelectBuilder(p, from_=p).where(p.id_1 > 1).as_object("p")
     _, df = (
-        SelectBuilder(t, t.name, active.label)
+        SelectBuilder(t.name, active.label, from_=t)
         .join("INNER", active, t.id_1 == active.id_1)
         .run()
     )

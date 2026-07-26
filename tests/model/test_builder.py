@@ -132,7 +132,7 @@ def test_mssql_local_build():
     with EngineManager(None) as manager:
         handler = manager.create_engine(conn)
         sheet = handler.get_unit(SHEET)
-        select = builder.SelectBuilder(sheet)
+        select = builder.SelectBuilder(from_=sheet)
         _, df = select.run()
         df = df[[SHEET.Description, SHEET.TableName, SHEET.LastEditedBy_fk, SHEET.Active, SHEET.DaysToRefresh, SHEET.Model, SHEET.RequestAfterUpdate]]
         insert = builder.InsertBuilder(handler.get_unit(SHEET)).from_dataframe(df)

@@ -6,8 +6,10 @@ from sqlalchemy.schema import CreateTable
 
 from ..connect._engine_handler import EngineHandler
 from ..model.base_model import BaseModel
+from ..model._builders._column_metadata import ColumnMetadata
 from ..model.units import ObjectUnit
 from ..types.dialect_types import DialectTypes
+from ..types.temp_table_types import TempTableType
 from ._base import SqlBuilder
 from ._utils import DataFrameTemp, sa_type_from_series
 
@@ -16,20 +18,51 @@ class TempBuilder(SqlBuilder):
     """Builds the dialect-correct ``CREATE TABLE`` for a temporary table
     named ``TEMP_<source>``, cloning an object unit's columns.
 
+    The staging type controls whether database-defaulted columns are retained;
+    identity and computed columns are omitted from the staging variants but
+    kept by ``FULL``.
     ``global_temp`` makes it visible to other sessions where the dialect
     supports that (``##`` on MSSQL, inherent on Oracle, error elsewhere).
     """
 
-    def __init__(self, source: ObjectUnit[Any], global_temp: bool = False) -> None:
+    def __init__(
+        self,
+        source: ObjectUnit[Any],
+        global_temp: bool = False,
+        stage: TempTableType = TempTableType.STAGE,
+    ) -> None:
         table = source._selectable
         if not isinstance(table, sa.Table):
             raise TypeError("temp source must be a plain object unit, not an aliased one")
 
+        generated = self._database_generated_columns(source._base, stage)
         columns = [
-            sa.Column(c.name, c.type, nullable=c.nullable, primary_key=c.primary_key)
+            sa.Column(
+                c.name,
+                c.type,
+                nullable=c.nullable,
+                primary_key=c.primary_key and stage is TempTableType.FULL,
+            )
             for c in table.columns
+            if c.name not in generated
         ]
         self._configure(source._base, source._handler, table.name, columns, global_temp)
+
+    @staticmethod
+    def _database_generated_columns(
+        base: type[BaseModel[Any]],
+        table_type: TempTableType,
+    ) -> set[str]:
+        if table_type is TempTableType.FULL:
+            return set()
+
+        return {
+            str(name)
+            for name, column in base.to_schema().columns.items()
+            if (metadata := ColumnMetadata.from_dict(column.metadata)).identity
+            or metadata.computed
+            or (metadata.has_default and table_type is TempTableType.STAGE)
+        }
 
     @classmethod
     def from_dataframe(
@@ -48,6 +81,10 @@ class TempBuilder(SqlBuilder):
         to resolve them through a generated model's field names instead.
         """
         self = cls.__new__(cls)
+        if df.columns.has_duplicates:
+            duplicates = df.columns[df.columns.duplicated()].unique().tolist()
+            raise ValueError(f"DataFrame has duplicate column names: {duplicates}")
+
         columns = [sa.Column(str(c), sa_type_from_series(df[c])) for c in df.columns]
         self._configure(base or DataFrameTemp, handler, name, columns, global_temp)
         return self
