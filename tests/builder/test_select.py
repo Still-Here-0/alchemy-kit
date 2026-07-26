@@ -1,64 +1,14 @@
-from typing import Any, Optional, cast
+from typing import Any
 
-import pandas as pd
-import pandera.pandas as pa
 import pytest
-import sqlalchemy
-from pandera.typing import Series
 
 from alchemy_kit.builder import InsertBuilder, SelectBuilder, TempBuilder
-from alchemy_kit.builder._utils import DataFrameTemp
 from alchemy_kit.connect._engine_handler import EngineHandler
-from alchemy_kit.connect._info import ConnectionInfo
-from alchemy_kit.model.base_model import BaseModel, MetaData
 from alchemy_kit.model.units import OperandUnit
-from alchemy_kit.resources._sql import SQL
 from alchemy_kit.resources.dialect_map import get_sa_dialect
 from alchemy_kit.types.dialect_types import DialectTypes
-from alchemy_kit.types.sql_type_parameters import MssqlTypeParameters, SqliteTypeParameters
 
-
-class items(BaseModel[SqliteTypeParameters]):
-    id_1: Series[int] = pa.Field(nullable=False, alias="id", metadata={"original_type": "integer"})
-    name: Series[str] = pa.Field(nullable=False, alias="name", metadata={"original_type": "varchar"})
-    price: Optional[Series[float]] = pa.Field(nullable=True, alias="price", metadata={"original_type": "real"})
-
-    class Config(BaseModel.Config):
-        metadata = MetaData(
-            schema_name="main", obj_name="items", obj_type="Table",
-            reference_name='"main"."items"', description=None,
-        )
-
-
-class parts(BaseModel[SqliteTypeParameters]):
-    id_1: Series[int] = pa.Field(nullable=False, alias="id", metadata={"original_type": "integer"})
-    label: Series[str] = pa.Field(nullable=False, alias="label", metadata={"original_type": "varchar"})
-
-    class Config(BaseModel.Config):
-        metadata = MetaData(
-            schema_name="main", obj_name="parts", obj_type="Table",
-            reference_name='"main"."parts"', description=None,
-        )
-
-
-class mssql_items(BaseModel[MssqlTypeParameters]):
-    id_1: Series[int] = pa.Field(nullable=False, alias="id", metadata={"original_type": "int"})
-
-    class Config(BaseModel.Config):
-        metadata = MetaData(
-            schema_name="dbo", obj_name="items", obj_type="Table",
-            reference_name="[dbo].[items]", description=None,
-        )
-
-
-SQLITE_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("sqlite://")))
-MSSQL_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("mssql+pyodbc://")))
-
-
-@pytest.fixture
-def handler():
-    engine = sqlalchemy.create_engine("sqlite://")
-    return EngineHandler(engine, ConnectionInfo(sqlalchemy.make_url("sqlite://")))
+from _helpers import MSSQL_HANDLER, SQLITE_HANDLER, items, mssql_items, parts
 
 
 def test_every_dialect_compiles_with_named_paramstyle():
@@ -92,20 +42,6 @@ def test_select_builder_is_immutable():
 
     assert "WHERE" not in base.render()
     assert "WHERE" in filtered.render()
-
-
-def test_mixing_engine_handlers_raises(handler: EngineHandler):
-    i = handler.get_unit(items)
-    o = SQLITE_HANDLER.get_unit(items)
-
-    with pytest.raises(ValueError):
-        SelectBuilder(i.name, o.id_1, from_=i)
-    with pytest.raises(ValueError):
-        SelectBuilder(i.name, from_=i).where(o.price > 1)
-    with pytest.raises(ValueError):
-        SelectBuilder(i.name, from_=i).order_by(o.price.desc())
-    with pytest.raises(ValueError):
-        InsertBuilder(handler.get_unit(items)).from_select(SelectBuilder(o.id_1, from_=o))
 
 
 def test_cross_join_compiles_and_runs(handler: EngineHandler):
@@ -173,180 +109,6 @@ def test_join_condition_arity():
         SelectBuilder(i.name, from_=i).join("CROSS", o, i.id_1 == o.id_1)
     with pytest.raises(TypeError):
         SelectBuilder(i.name, from_=i).join("INNER", o)
-
-
-def test_insert_to_sqls_chunks_and_runs_with_temp_table(handler: EngineHandler):
-    tmp = TempBuilder(handler.get_unit(items))
-    insert = InsertBuilder(tmp.unit()).from_dataframe(pd.DataFrame([
-        {"id_1": 1, "name": "bolt", "price": 0.5},
-        {"id_1": 2, "name": "nut", "price": 1.5},
-        {"id_1": 3, "name": "gear", "price": 9.0},
-    ]))
-
-    insert_sqls = insert.to_sqls(chunk_size=2)
-    assert len(insert_sqls) == 2
-
-    results = handler.run_sqls([
-        tmp.to_sql(),
-        *insert_sqls,
-        SelectBuilder(tmp.unit().name, from_=tmp.unit()).to_sql(),
-    ])
-
-    assert sorted(results[-1][1]["name"].tolist()) == ["bolt", "gear", "nut"]
-
-def test_insert_run_uses_to_sqls_and_aggregates_chunks(handler: EngineHandler):
-    tmp = TempBuilder(handler.get_unit(items))
-    tmp.run()
-    insert = InsertBuilder(tmp.unit()).from_dataframe(pd.DataFrame([
-        {"id_1": 1, "name": "bolt", "price": 0.5},
-        {"id_1": 2, "name": "nut", "price": 1.5},
-        {"id_1": 3, "name": "gear", "price": 9.0},
-    ]))
-
-    count, data = insert.run(chunk_size=2)
-
-    assert count == 3
-    assert data.empty
-
-
-def test_insert_rejects_aliased_unit():
-    with pytest.raises(TypeError):
-        InsertBuilder(SQLITE_HANDLER.get_unit(items).set_alias("x"))
-
-
-def test_temp_round_trip_through_run_sql(handler: EngineHandler):
-    tmp = TempBuilder(handler.get_unit(items))
-    assert 'CREATE TEMPORARY TABLE "TEMP_items"' in tmp.render()
-    tmp.run()
-
-    t = tmp.unit()
-    for row in [
-        dict(id_1=1, name="bolt", price=0.5),
-        dict(id_1=2, name="nut", price=1.5),
-        dict(id_1=3, name="gear", price=9.0),
-    ]:
-        InsertBuilder(t).from_values(**row).run()
-
-    _, df = SelectBuilder(t.name, t.price, from_=t).where(t.price > 1).order_by(t.price.desc()).run()
-    assert df["name"].tolist() == ["gear", "nut"]
-
-    handler.run_sql(SQL(raw_query="CREATE TABLE main.items (id INTEGER NOT NULL, name VARCHAR NOT NULL, price REAL)"))
-    moved, _ = (
-        InsertBuilder(handler.get_unit(items))
-        .from_select(SelectBuilder(t.id_1, t.name, t.price, from_=t).where(t.price > 1))
-        .run()
-    )
-    assert moved == 2
-
-    _, real = SelectBuilder(from_=handler.get_unit(items)).run()
-    assert sorted(real["name"].tolist()) == ["gear", "nut"]
-
-
-def test_global_temp_rejected_on_unsupported_dialect():
-    with pytest.raises(ValueError):
-        TempBuilder(SQLITE_HANDLER.get_unit(items), global_temp=True)
-
-
-def test_mssql_temp_naming():
-    assert "[#TEMP_items]" in TempBuilder(MSSQL_HANDLER.get_unit(mssql_items)).render()
-    assert "[##TEMP_items]" in TempBuilder(MSSQL_HANDLER.get_unit(mssql_items), global_temp=True).render()
-
-
-def test_from_dataframe_infers_column_types():
-    df = pd.DataFrame({
-        "flag": [True, False],
-        "count": [1, 2],
-        "price": [0.5, 1.5],
-        "moment": pd.to_datetime(["2024-01-01", "2024-02-01"]),
-        "span": pd.to_timedelta([1, 2], unit="D"),
-        "label": ["bolt", "a-much-longer-label"],
-        "blank": [None, None],
-    })
-    builder = TempBuilder.from_dataframe(df, SQLITE_HANDLER, "stuff")
-
-    types = {c.name: type(c.type) for c in builder._table.columns}
-    assert types == {
-        "flag": sqlalchemy.Boolean,
-        "count": sqlalchemy.BigInteger,
-        "price": sqlalchemy.Float,
-        "moment": sqlalchemy.DateTime,
-        "span": sqlalchemy.Interval,
-        "label": sqlalchemy.String,
-        "blank": sqlalchemy.String,
-    }
-
-    rendered = builder.render()
-    assert 'CREATE TEMPORARY TABLE "TEMP_stuff"' in rendered
-    assert "label VARCHAR(19)" in rendered
-    assert "blank VARCHAR(1)" in rendered
-
-
-def test_from_dataframe_infers_schema_without_rows():
-    df = pd.DataFrame({"id": pd.Series(dtype="int64"), "name": pd.Series(dtype="object")})
-    rendered = TempBuilder.from_dataframe(df, SQLITE_HANDLER, "empty").render()
-
-    assert "id BIGINT" in rendered
-    assert "name VARCHAR(1)" in rendered
-
-
-def test_from_dataframe_stringifies_column_labels():
-    builder = TempBuilder.from_dataframe(pd.DataFrame([[1, 2]]), SQLITE_HANDLER, "nums")
-    assert [c.name for c in builder._table.columns] == ["0", "1"]
-
-
-def test_from_dataframe_round_trip(handler: EngineHandler):
-    df = pd.DataFrame([
-        {"a": 1, "b": "bolt", "c": 0.5},
-        {"a": 2, "b": "nut", "c": 1.5},
-    ])
-    tmp = TempBuilder.from_dataframe(df, handler, "raw")
-    tmp.run()
-
-    t = tmp.unit()
-    InsertBuilder(t).from_dataframe(df).run()
-
-    _, out = SelectBuilder(t.a, t.b, t.c, from_=t).where(t.c > 1).run()
-    assert out["b"].tolist() == ["nut"]
-    assert out["a"].tolist() == [2]
-
-
-def test_from_dataframe_base_resolves_model_field_names(handler: EngineHandler):
-    df = pd.DataFrame([
-        {"id": 1, "name": "bolt", "price": 0.5},
-        {"id": 2, "name": "nut", "price": 1.5},
-    ])
-    tmp = TempBuilder.from_dataframe(df, handler, "items", base=items)
-    assert 'CREATE TEMPORARY TABLE "TEMP_items"' in tmp.render()
-    tmp.run()
-
-    t = tmp.unit()
-    InsertBuilder(t).from_dataframe(df).run()
-
-    _, out = SelectBuilder(t.name, t.price, from_=t).where(t.price > 1).order_by(t.id_1).run()
-    assert out["name"].tolist() == ["nut"]
-
-
-def test_from_dataframe_default_base_uses_raw_column_names(handler: EngineHandler):
-    tmp = TempBuilder.from_dataframe(pd.DataFrame([{"id": 1}]), handler, "raw")
-
-    assert tmp.unit()._base is DataFrameTemp
-    with pytest.raises(AttributeError):
-        tmp.unit().id_1
-
-
-def test_from_dataframe_mssql_naming():
-    df = pd.DataFrame([{"id": 1}])
-    assert "[#TEMP_stuff]" in TempBuilder.from_dataframe(df, MSSQL_HANDLER, "stuff").render()
-    assert "[##TEMP_stuff]" in TempBuilder.from_dataframe(
-        df, MSSQL_HANDLER, "stuff", global_temp=True
-    ).render()
-
-
-def test_from_dataframe_global_temp_rejected_on_unsupported_dialect():
-    with pytest.raises(ValueError):
-        TempBuilder.from_dataframe(
-            pd.DataFrame([{"id": 1}]), SQLITE_HANDLER, "stuff", global_temp=True
-        )
 
 
 def test_null_safe_comparisons(handler: EngineHandler):
