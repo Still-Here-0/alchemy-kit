@@ -120,6 +120,40 @@ def test_build_generates_package(monkeypatch: pytest.MonkeyPatch):
     for path in result_dir.rglob("*.py*"):
         compile(path.read_text(), str(path), "exec")
 
+def _grouped_model() -> DBModel:
+    model = DBModel("testdb", DialectTypes.MSSQL)
+
+    dbo = SchemaModel("dbo")
+    dbo.objects["users"] = _object("users", [_column("id", "int")])
+
+    active_users = ObjectModel("active_users", "View", None)
+    active_users.columns["id"] = _column("id", "int")
+    dbo.objects["active_users"] = active_users
+
+    model.schemas["dbo"] = dbo
+    return model
+
+def test_build_generates_grouped_package(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(_builder, "parse_db", lambda *args, **kwargs: _grouped_model())
+
+    shutil.rmtree(PREVIEW_DIR, ignore_errors=True)
+    result_dir = PREVIEW_DIR
+    build(cast(ConnectionInfo, None), result_dir, group_by_type=True)
+
+    assert (result_dir / "__init__.py").exists()
+    assert (result_dir / "dbo" / "__init__.py").read_text().strip() == ""
+
+    assert (result_dir / "dbo" / "tables" / "users_MODULE.py").exists()
+    assert (result_dir / "dbo" / "tables" / "users_MODULE.pyi").exists()
+    assert (result_dir / "dbo" / "tables" / "__init__.py").read_text().strip() == "from .users_MODULE import users"
+
+    assert (result_dir / "dbo" / "views" / "active_users_MODULE.py").exists()
+    assert (result_dir / "dbo" / "views" / "active_users_MODULE.pyi").exists()
+    assert (result_dir / "dbo" / "views" / "__init__.py").read_text().strip() == "from .active_users_MODULE import active_users"
+
+    for path in result_dir.rglob("*.py*"):
+        compile(path.read_text(), str(path), "exec")
+
 @pytest.mark.local
 def test_mssql_local_build():
     conn = info_builder.from_env(ROOT/".env-mssql")

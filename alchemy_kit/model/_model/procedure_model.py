@@ -1,5 +1,7 @@
 from typing import Literal, TypeAlias
 
+from ...types._sql_utilities import UnitType
+
 ParameterMode: TypeAlias = Literal["IN", "OUT", "INOUT"]
 
 
@@ -24,6 +26,7 @@ class ProcedureModel:
 
     def __init__(self, name: str, description: str | None) -> None:
         self.name = name
+        self.type: UnitType = "Procedure"
         self.description = description
         self.parameters: list[ParameterModel] = []
 

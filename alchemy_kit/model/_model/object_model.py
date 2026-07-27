@@ -1,13 +1,13 @@
 from .column_model import ColumnModel
 from .constraint_model import CheckConstraintModel, FilteredUniqueIndexModel, ForeignKeyConstraintModel
-from ...types._sql_utilities import ObjectType
+from ...types._sql_utilities import UnitType
 
 
 class ObjectModel:
 
-    def __init__(self, obj_name: str, obj_type: ObjectType, description: str | None) -> None:
+    def __init__(self, obj_name: str, obj_type: UnitType, description: str | None) -> None:
         self.name = obj_name
-        self.type = obj_type
+        self.type: UnitType = obj_type
         self.description = description
         self.columns: dict[str, ColumnModel] = {}
         self._unique_constrait: set[frozenset[str]] = set()

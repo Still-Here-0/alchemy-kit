@@ -11,9 +11,10 @@ from ._utils import clear_dir, parse_db
 def build(
         conn_info: ConnectionInfo,
         result_dir: Path,
-        *, 
+        *,
         schema_config: SchemaConfig | None = None,
         clear_result_dir: bool = False,
+        group_by_type: bool = False,
         logger: Logger | BetterLogger | None = None,
     ):
     if result_dir.is_file():
@@ -31,7 +32,7 @@ def build(
     # TODO: log init builder
 
     model = parse_db(conn_info, schema_config, logger)
-    _builders.build_model(model, result_dir, logger)
+    _builders.build_model(model, result_dir, logger, group_by_type)
 
 def build_svg(conn_info: ConnectionInfo, result_path: Path, *, schema_config: SchemaConfig | None = None, logger: Logger | BetterLogger | None):
     if result_path.suffix != ".svg":
