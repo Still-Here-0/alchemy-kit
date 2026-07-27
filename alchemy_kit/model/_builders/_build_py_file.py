@@ -92,7 +92,7 @@ class PyFileBuilder:
             f"alias={column_model.name!r}",
         ]
 
-        if column_model.is_unique or column_model.is_primary_key:
+        if column_model.is_unique:
             parameters.append("unique=True")
 
         str_length = get_str_length(self.db_dialect, column_model)

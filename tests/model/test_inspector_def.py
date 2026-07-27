@@ -80,9 +80,13 @@ def test_parse_db_columns(sqlite_info: ConnectionInfo):
     assert users.columns["country"].has_default
     assert users.columns["country"].default == "'PT'"
 
+    assert users.columns["id"].is_unique
+
     orders = model.schemas["main"].objects["orders"]
     assert orders.columns["id"].is_primary_key
     assert orders.columns["seq"].is_primary_key
+    assert not orders.columns["id"].is_unique
+    assert not orders.columns["seq"].is_unique
     assert orders.columns["total"].precision == 10
     assert orders.columns["total"].scale == 2
 

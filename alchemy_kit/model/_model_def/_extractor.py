@@ -121,6 +121,10 @@ class MetadataExtractor:
         columns = self._get_columns(schema_name, object_name)
         pk_columns = set(self._get_pk_columns(schema_name, object_name))
         unique_columns = self._get_single_column_uniques(schema_name, object_name)
+
+        if len(pk_columns) == 1:
+            unique_columns |= pk_columns
+
         fk_map = self._get_column_fk_map(schema_name, object_name)
 
         rows = []

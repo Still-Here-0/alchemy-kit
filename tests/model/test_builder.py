@@ -28,6 +28,8 @@ def _column(
     identity: bool = False,
     computed: bool = False,
     has_default: bool = False,
+    unique: bool = False,
+    primary_key: bool = False,
     fk_ref: ForeignKeyModel | None = None,
 ) -> ColumnModel:
     return ColumnModel(
@@ -42,8 +44,8 @@ def _column(
         collation_name=None,
         has_default=has_default,
         default=None,
-        is_unique=False,
-        is_primary_key=False,
+        is_unique=unique,
+        is_primary_key=primary_key,
         is_foreign_key=fk_ref is not None,
         description=None,
         fk_ref=fk_ref,
@@ -161,6 +163,44 @@ def test_optional_reflects_db_supplied_columns_not_nullability(monkeypatch: pyte
     assert "Optional[" not in pyi
     for column in ("gen_id", "created", "total", "email", "name"):
         assert f"    {column}: Series[" in pyi
+
+def _primary_key_model() -> DBModel:
+    model = DBModel("testdb", DialectTypes.MSSQL)
+
+    dbo = SchemaModel("dbo")
+    dbo.objects["people"] = _object("people", [
+        _column("id", "int", unique=True, primary_key=True),
+        _column("name", "varchar"),
+    ])
+
+    profile_groups = _object("profile_groups", [
+        _column("profile_fk", "int", primary_key=True),
+        _column("group_fk", "int", primary_key=True),
+        _column("note", "varchar", nullable=True),
+    ])
+    profile_groups.add_unique_constrait(["profile_fk", "group_fk"])
+    dbo.objects["profile_groups"] = profile_groups
+
+    model.schemas["dbo"] = dbo
+    return model
+
+def test_composite_primary_key_columns_are_not_individually_unique(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    monkeypatch.setattr(_builder, "parse_db", lambda *args, **kwargs: _primary_key_model())
+
+    build(cast(ConnectionInfo, None), tmp_path)
+
+    people = (tmp_path / "dbo" / "people_MODULE.py").read_text()
+    id_line = next(line for line in people.splitlines() if "alias='id'" in line)
+    assert "unique=True" in id_line
+
+    groups = (tmp_path / "dbo" / "profile_groups_MODULE.py").read_text()
+    for column in ("profile_fk", "group_fk"):
+        column_line = next(line for line in groups.splitlines() if line.strip().startswith(f"{column}:"))
+        assert "'primary_key': True" in column_line
+        assert "unique=True" not in column_line
+
+    unique_line = next(line for line in groups.splitlines() if line.strip().startswith("unique=[["))
+    assert "'profile_fk'" in unique_line and "'group_fk'" in unique_line
 
 def _grouped_model() -> DBModel:
     model = DBModel("testdb", DialectTypes.MSSQL)
