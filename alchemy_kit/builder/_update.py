@@ -4,10 +4,8 @@ import sqlalchemy as sa
 from sqlalchemy.sql.expression import Update
 
 from ..model.units import BooleanColumnUnit, ColumnUnit, ObjectUnit
-from ..types.sql_types import SqlScalarType
 from ._base import SqlBuilder
-
-type _Assignment = tuple[ColumnUnit[Any], ColumnUnit[Any] | SqlScalarType]
+from ._utils import _Assignment
 
 
 class UpdateBuilder(SqlBuilder):

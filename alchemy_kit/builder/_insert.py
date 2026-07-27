@@ -11,6 +11,7 @@ from ..resources.dialect_map import get_map
 from ..types.sql_types import SqlScalarType
 from ._base import SqlBuilder
 from ._select import SelectBuilder
+from ._utils import _Assignment
 
 
 class InsertBuilder(SqlBuilder):
@@ -58,16 +59,26 @@ class InsertBuilder(SqlBuilder):
         if not (values := self._stmt._values):
             return {}
 
-        return {str(column): parameter.value for column, parameter in values.items()}
+        return {getattr(column, "name", column): parameter.value for column, parameter in values.items()}
 
-    def from_values(self, **column_values: SqlScalarType) -> "InsertBuilder":
-        """Set the inserted row's values by model field (or SQL column)
-        name; plain values are bound as parameters."""
-        resolved = {
-            self._sql_name(name): ColumnUnit._value_operand(value)
-            for name, value in column_values.items()
-        }
-        return self._with(self._stmt.values(**resolved))
+    def from_values(
+        self,
+        assignment: _Assignment,
+        *assignments: _Assignment,
+    ) -> "InsertBuilder":
+        """Set the inserted row's values as ``(column, value)`` pairs of units;
+        a plain value is bound as a parameter and a value unit renders as an
+        expression."""
+        pairs = (assignment, *assignments)
+        self._check_units(
+            *(unit for pair in pairs for unit in pair if isinstance(unit, ColumnUnit))
+        )
+        return self._with(
+            self._stmt.values({
+                column._element: ColumnUnit._value_operand(value)
+                for column, value in pairs
+            })
+        )
 
     def from_dataframe(
         self,

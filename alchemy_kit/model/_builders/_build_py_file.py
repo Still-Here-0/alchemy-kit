@@ -76,7 +76,7 @@ class PyFileBuilder:
     def _get_column_type(self, column_model: ColumnModel) -> str:
         column_type = ""
 
-        if column_model.is_nullable:
+        if column_model.is_optional:
             column_type += "Optional["
 
         py_type = get_type(self.db_dialect, column_model.type)

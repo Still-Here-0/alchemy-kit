@@ -85,8 +85,8 @@ def _staged_items(handler: EngineHandler):
     tmp = TempBuilder(handler.get_unit(items))
     tmp.run()
     t = tmp.unit()
-    InsertBuilder(t).from_values(id_1=1, name="bolt", price=0.5).run()
-    InsertBuilder(t).from_values(id_1=2, name="nut", price=1.5).run()
+    InsertBuilder(t).from_values((t.id_1, 1), (t.name, "bolt"), (t.price, 0.5)).run()
+    InsertBuilder(t).from_values((t.id_1, 2), (t.name, "nut"), (t.price, 1.5)).run()
     return t
 
 

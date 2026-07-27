@@ -95,10 +95,9 @@ with EngineManager(None) as manager:
     # SELECT name, price FROM items WHERE price > 1 ORDER BY price DESC
     _, df = (
         SelectBuilder(table.name, table.price, from_=table)
-        .where(table.price > 1)
-        .order_by(table.price.desc())
-        .run()
-    )
+          .where(table.price > 1)
+          .order_by(table.price.desc())
+    ).run()
     print(df)
 ```
 
@@ -113,8 +112,8 @@ mismatches are flagged by your editor. The builder also covers `join`,
 ```python
 from alchemy_kit.builder import InsertBuilder, UpdateBuilder, DeleteBuilder
 
-# INSERT a single row
-InsertBuilder(table).from_values(id_1=1, name="bolt", price=0.5).run()
+# INSERT a single row — (column, value) pairs, like set_values above
+InsertBuilder(table).from_values((table.id_1, 1), (table.name, "bolt"), (table.price, 0.5)).run()
 
 # Bulk INSERT a DataFrame, chunked
 InsertBuilder(table).from_dataframe(df).run(chunk_size=1_000)

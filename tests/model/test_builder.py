@@ -20,18 +20,27 @@ from alchemy_kit.types.dialect_types import DialectTypes
 ROOT = Path(__file__).resolve().parent.parent
 PREVIEW_DIR = ROOT / "secret_model_preview"
 
-def _column(name: str, column_type: str, *, nullable: bool = False, fk_ref: ForeignKeyModel | None = None) -> ColumnModel:
+def _column(
+    name: str,
+    column_type: str,
+    *,
+    nullable: bool = False,
+    identity: bool = False,
+    computed: bool = False,
+    has_default: bool = False,
+    fk_ref: ForeignKeyModel | None = None,
+) -> ColumnModel:
     return ColumnModel(
         name=name,
         column_type=column_type,
         is_nullable=nullable,
-        is_identity=False,
-        is_computed=False,
+        is_identity=identity,
+        is_computed=computed,
         max_length=None,
         precision=None,
         scale=None,
         collation_name=None,
-        has_default=False,
+        has_default=has_default,
         default=None,
         is_unique=False,
         is_primary_key=False,
@@ -119,6 +128,39 @@ def test_build_generates_package(monkeypatch: pytest.MonkeyPatch):
 
     for path in result_dir.rglob("*.py*"):
         compile(path.read_text(), str(path), "exec")
+
+def _optional_model() -> DBModel:
+    model = DBModel("testdb", DialectTypes.MSSQL)
+    dbo = SchemaModel("dbo")
+    dbo.objects["products"] = _object("products", [
+        _column("gen_id", "int", identity=True),
+        _column("created", "date", has_default=True),
+        _column("total", "decimal", computed=True),
+        _column("email", "varchar", nullable=True),
+        _column("name", "varchar"),
+    ])
+    model.schemas["dbo"] = dbo
+    return model
+
+def test_optional_reflects_db_supplied_columns_not_nullability(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(_builder, "parse_db", lambda *args, **kwargs: _optional_model())
+
+    shutil.rmtree(PREVIEW_DIR, ignore_errors=True)
+    build(cast(ConnectionInfo, None), PREVIEW_DIR)
+
+    py = (PREVIEW_DIR / "dbo" / "products_MODULE.py").read_text()
+    pyi = (PREVIEW_DIR / "dbo" / "products_MODULE.pyi").read_text()
+
+    assert "    gen_id: Optional[Series[" in py
+    assert "    created: Optional[Series[" in py
+    assert "    total: Optional[Series[" in py
+    assert "    email: Series[" in py and "    email: Optional[" not in py
+    assert "    name: Series[" in py and "    name: Optional[" not in py
+    assert "nullable=True" in py
+
+    assert "Optional[" not in pyi
+    for column in ("gen_id", "created", "total", "email", "name"):
+        assert f"    {column}: Series[" in pyi
 
 def _grouped_model() -> DBModel:
     model = DBModel("testdb", DialectTypes.MSSQL)

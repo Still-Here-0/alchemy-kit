@@ -3,13 +3,11 @@ from typing import Any
 import pandas as pd
 from sqlalchemy.sql.expression import Update
 
-from ..model.units import BooleanColumnUnit, ColumnUnit, ObjectUnit
+from ..model.units import BooleanColumnUnit, ObjectUnit
 from ..resources._sql import SQL
-from ..types.sql_types import SqlScalarType
 from ..types.typestate import Set, Unset
 from ._base import SqlBuilder
-
-type _Assignment = tuple[ColumnUnit[Any], ColumnUnit[Any] | SqlScalarType]
+from ._utils import _Assignment
 
 # S -> set_values()
 # W -> where()

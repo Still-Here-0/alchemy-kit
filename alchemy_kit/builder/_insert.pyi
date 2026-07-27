@@ -10,6 +10,7 @@ from ..types.sql_types import SqlScalarType
 from ..types.typestate import Set, Unset
 from ._base import SqlBuilder
 from ._select import SelectBuilder
+from ._utils import _Assignment
 
 # F -> from_values() / from_dataframe() / from_select()
 class InsertBuilder[F](SqlBuilder):
@@ -21,7 +22,8 @@ class InsertBuilder[F](SqlBuilder):
     ) -> dict[str, SqlScalarType] | list[dict[str, SqlScalarType]]: ...
     def from_values(
         self: InsertBuilder[Unset],
-        **column_values: SqlScalarType,
+        assignment: _Assignment,
+        *assignments: _Assignment,
     ) -> InsertBuilder[Set]: ...
     def from_dataframe(
         self: InsertBuilder[Unset],

@@ -16,12 +16,9 @@ def test_temp_round_trip_through_run_sql(handler: EngineHandler):
     tmp.run()
 
     t = tmp.unit()
-    for row in [
-        dict(id_1=1, name="bolt", price=0.5),
-        dict(id_1=2, name="nut", price=1.5),
-        dict(id_1=3, name="gear", price=9.0),
-    ]:
-        InsertBuilder(t).from_values(**row).run()
+    InsertBuilder(t).from_values((t.id_1, 1), (t.name, "bolt"), (t.price, 0.5)).run()
+    InsertBuilder(t).from_values((t.id_1, 2), (t.name, "nut"), (t.price, 1.5)).run()
+    InsertBuilder(t).from_values((t.id_1, 3), (t.name, "gear"), (t.price, 9.0)).run()
 
     _, df = SelectBuilder(t.name, t.price, from_=t).where(t.price > 1).order_by(t.price.desc()).run()
     assert df["name"].tolist() == ["gear", "nut"]

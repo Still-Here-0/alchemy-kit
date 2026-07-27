@@ -43,3 +43,9 @@ class ColumnModel:
         self.description = description
         self.fk_ref = fk_ref
 
+    @property
+    def is_optional(self) -> bool:
+        """Whether the column may be omitted from a validated DataFrame because
+        the database supplies it: defaulted, computed or identity columns."""
+        return self.has_default or self.is_computed or self.is_identity
+

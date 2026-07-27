@@ -5,7 +5,10 @@ import sqlalchemy as sa
 from pandas.api import types as pdt
 
 from ..model.base_model import BaseModel
-from ..model.units import ObjectUnit
+from ..model.units import ColumnUnit, ObjectUnit
+from ..types.sql_types import SqlScalarType
+
+type _Assignment = tuple[ColumnUnit[Any], ColumnUnit[Any] | SqlScalarType]
 
 
 class DataFrameTemp(BaseModel):
