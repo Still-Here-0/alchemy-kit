@@ -5,12 +5,13 @@ from typing import Any, ClassVar
 from ...resources._identifiers import Identifiers
 from ...resources.dialect_map import get_codegen_imports, get_str_length, get_type, render_reference
 from ...types import DialectTypes, sql_type_parameters
+from ...types.model_metadata import ForeignKeyMeta
 from .._model.column_model import ColumnModel
 from .._model.constraint_model import CheckConstraintModel, FilteredUniqueIndexModel
 from .._model.object_model import ObjectModel
 from ..base_model import BaseModel
 from ._check_parser import ColumnComparisonCheck, IndexFilterCondition, parse_column_check, parse_index_filter, parse_table_check
-from ._column_metadata import ColumnMetadata, ForeignKeyMeta
+from ._column_metadata import ColumnMetadata
 
 
 @dataclass(kw_only=True)

@@ -1,7 +1,7 @@
 
 import copy
 from collections.abc import Iterator
-from typing import TYPE_CHECKING, Any, NotRequired, Self, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import pandas as pd
 from pandera.api.base.model import MetaModel
@@ -10,24 +10,14 @@ from pandera.typing import DataFrame
 
 from ..resources._sql import SQL
 from ..types.errors._model_validation_error import ModelValidationError
+from ..types.model_metadata import MetaData
 
 if TYPE_CHECKING:
     from ..connect._engine_handler import EngineHandler
-    from ._builders._column_metadata import ForeignKeyMeta
+    from ..types.model_metadata import ForeignKeyMeta
     from .units._object_unit import ObjectUnit
 
 __all__ = ["MetaData", "BaseModel"]
-
-class MetaData(TypedDict):
-    """Identifying metadata for the SQL object a model represents."""
-
-    schema_name: str
-    obj_name: str
-    obj_type: str
-    reference_name: str
-    description: str | None
-    unparsed_checks: NotRequired[dict[str, str]]
-    unparsed_indexes: NotRequired[dict[str, str]]
 
 
 class _BaseModelMeta(MetaModel):

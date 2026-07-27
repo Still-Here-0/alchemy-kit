@@ -1,11 +1,7 @@
 from dataclasses import dataclass, fields
-from typing import Any, Optional, TypedDict
+from typing import Any, Optional
 
-
-class ForeignKeyMeta(TypedDict):
-    schema: str
-    table: str
-    column: str
+from ...types.model_metadata import ForeignKeyMeta
 
 
 @dataclass

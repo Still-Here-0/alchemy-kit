@@ -1,8 +1,4 @@
-from typing import Literal, TypeAlias
-
-from ...types._sql_utilities import UnitType
-
-ParameterMode: TypeAlias = Literal["IN", "OUT", "INOUT"]
+from ...types._sql_utilities import ParameterMode, UnitType
 
 
 class ParameterModel:

@@ -1,29 +1,12 @@
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
+
+from ..types.model_metadata import CallMetaData, CallParameter
 
 if TYPE_CHECKING:
     from ..connect._engine_handler import EngineHandler
     from .units._call_unit import CallableUnit
 
 __all__ = ["CallableModel", "CallMetaData", "CallParameter"]
-
-
-class CallParameter(TypedDict):
-    """One stored-procedure parameter as recorded on a callable model."""
-
-    name: str
-    sql_type: str
-    is_nullable: bool
-    mode: str
-
-
-class CallMetaData(TypedDict):
-    """Identifying metadata for the stored procedure a callable model represents."""
-
-    schema_name: str
-    name: str
-    reference_name: str
-    description: str | None
-    parameters: list[CallParameter]
 
 
 class CallableModel[_TypeParameters: str]:

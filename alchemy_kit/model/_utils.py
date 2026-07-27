@@ -8,12 +8,12 @@ import pandas as pd
 from ..connect._engine_manager import EngineManager
 from ..connect._info import ConnectionInfo
 from ..resources._better_logger import BetterLogger
-from ..types._sql_utilities import UnitType
+from ..types._sql_utilities import ParameterMode, UnitType
 from ._model.column_model import ColumnModel, ForeignKeyModel
 from ._model.constraint_model import CheckConstraintModel, FilteredUniqueIndexModel, ForeignKeyConstraintModel
 from ._model.db_model import DBModel
 from ._model.object_model import ObjectModel
-from ._model.procedure_model import ParameterModel, ParameterMode, ProcedureModel
+from ._model.procedure_model import ParameterModel, ProcedureModel
 from ._model.schema_model import SchemaModel
 from ._model_def import (
     ListCheckConstraints,
