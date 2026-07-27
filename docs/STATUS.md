@@ -41,6 +41,10 @@ internally (it manages transaction boundaries). DCL will not be implemented.
 - [ ] DROP
 - [ ] RENAME
 
+Note: CREATE, ALTER, DROP and RENAME must also update the active database model
+in the current repo, keeping the generated models in sync with the schema they
+change.
+
 ## TCL — Transaction Control Language
 
 Managed by the library, not exposed as user statements.
