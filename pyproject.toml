@@ -1,6 +1,6 @@
 [project]
 name = "alchemy-kit"
-version = "0.3.1"
+version = "0.3.2"
 description = "A typed, reflection-generated, multi-dialect, DataFrame-first SQL toolkit for Python."
 readme = "README.md"
 requires-python = ">=3.12"
