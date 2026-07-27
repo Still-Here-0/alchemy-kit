@@ -5,14 +5,11 @@ from sqlalchemy.sql.expression import Delete
 from ..model.units import BooleanColumnUnit, ObjectUnit
 from ..types.typestate import Set, Unset
 from ._base import SqlBuilder
-from ._truncate import TruncateBuilder
 
 # W -> where()
 class DeleteBuilder[W](SqlBuilder):
     def __new__(cls, target: ObjectUnit[Any]) -> DeleteBuilder[Unset]: ...
     def __init__(self, target: ObjectUnit[Any]) -> None: ...
-    @classmethod
-    def truncate(cls, target: ObjectUnit[Any]) -> TruncateBuilder: ...
     def _statement(self) -> Delete: ...
     def where(
         self: DeleteBuilder[Unset],

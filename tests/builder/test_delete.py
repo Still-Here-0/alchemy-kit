@@ -56,28 +56,21 @@ def test_delete_rejects_aliased_unit():
 
 def test_truncate_rejects_aliased_unit():
     with pytest.raises(TypeError):
-        DeleteBuilder.truncate(SQLITE_HANDLER.get_unit(items).set_alias("x"))
+        TruncateBuilder(SQLITE_HANDLER.get_unit(items).set_alias("x"))
 
 
 def test_truncate_renders_truncate_table():
     i = MSSQL_HANDLER.get_unit(mssql_items)
-    rendered = DeleteBuilder.truncate(i).render()
+    rendered = TruncateBuilder(i).render()
 
     assert rendered == "TRUNCATE TABLE dbo.items"
 
 
 def test_truncate_renders_delete_on_sqlite():
     i = SQLITE_HANDLER.get_unit(items)
-    rendered = DeleteBuilder.truncate(i).render()
+    rendered = TruncateBuilder(i).render()
 
     assert rendered == "DELETE FROM main.items"
-
-
-def test_truncate_builder_constructed_directly():
-    i = MSSQL_HANDLER.get_unit(mssql_items)
-
-    assert isinstance(DeleteBuilder.truncate(i), TruncateBuilder)
-    assert TruncateBuilder(i).render() == "TRUNCATE TABLE dbo.items"
 
 
 def test_mixing_engine_handlers_raises(handler: EngineHandler):
@@ -112,7 +105,7 @@ def test_delete_runs_and_reports_row_count(handler: EngineHandler):
 def test_truncate_runs_and_clears_table(handler: EngineHandler):
     t = _staged_items(handler)
 
-    DeleteBuilder.truncate(t).run()
+    TruncateBuilder(t).run()
 
     _, df = SelectBuilder(from_=t).run()
     assert df.empty
