@@ -1,13 +1,12 @@
 
 import shutil
 from pathlib import Path
-from typing import Any, cast
-
-import pandas as pd
+from typing import cast
 
 from ..connect._engine_manager import EngineManager
 from ..connect._info import ConnectionInfo
 from ..resources._better_logger import BetterLogger
+from ..resources._pandas import none_if_na
 from ..types._sql_utilities import ParameterMode, UnitType
 from ._model.column_model import ColumnModel, ForeignKeyModel
 from ._model.constraint_model import CheckConstraintModel, FilteredUniqueIndexModel, ForeignKeyConstraintModel
@@ -150,7 +149,4 @@ def parse_db(conn_info: ConnectionInfo, schema_conf: SchemaConfig, logger: Bette
                     procedure.add_parameter(parameter)
 
     return db
-
-def none_if_na(value: Any) -> Any:
-    return None if pd.isna(value) else value
 

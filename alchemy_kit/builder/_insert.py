@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.sql.expression import Insert
 
 from ..model.units import ColumnUnit, ObjectUnit
+from ..resources._pandas import none_if_na
 from ..resources._sql import SQL
 from ..resources.dialect_map import get_map
 from ..types.sql_types import SqlScalarType
@@ -59,7 +60,10 @@ class InsertBuilder(SqlBuilder):
         if not (values := self._stmt._values):
             return {}
 
-        return {getattr(column, "name", column): parameter.value for column, parameter in values.items()}
+        return cast(
+            "dict[str, SqlScalarType]",
+            {getattr(column, "name", column): parameter.value for column, parameter in values.items()},
+        )
 
     def from_values(
         self,
@@ -91,7 +95,7 @@ class InsertBuilder(SqlBuilder):
         target = {name: self._sql_name(name) for name in source}
         
         rows = [
-            {target[name]: ColumnUnit._value_operand(record[name]) for name in source}
+            {target[name]: ColumnUnit._value_operand(none_if_na(record[name])) for name in source}
             for record in df.to_dict(orient="records")
         ]
         return self._with(self._stmt.values(rows))
