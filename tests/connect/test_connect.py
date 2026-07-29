@@ -50,3 +50,16 @@ def test_manager():
         assert handler._con_info.unique_id == "a"
 
 
+
+
+def test_engine_kwargs_enable_fast_executemany_for_pyodbc():
+    explicit = ConnectionInfo(sqlalchemy.make_url("mssql+pyodbc://"))
+    default_driver = ConnectionInfo(sqlalchemy.make_url("mssql://"))
+
+    assert explicit.engine_kwargs() == {"fast_executemany": True}
+    assert default_driver.engine_kwargs() == {"fast_executemany": True}
+
+
+def test_engine_kwargs_are_empty_for_drivers_that_batch_natively():
+    for url in ("mssql+pymssql://", "postgresql+psycopg://", "oracle+oracledb://", "sqlite://"):
+        assert ConnectionInfo(sqlalchemy.make_url(url)).engine_kwargs() == {}

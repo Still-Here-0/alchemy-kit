@@ -1,6 +1,7 @@
 import random
 import string
 from pathlib import Path
+from typing import Any
 
 import sqlalchemy
 
@@ -45,6 +46,20 @@ class ConnectionInfo:
             return DialectTypes(backend)
         except ValueError:
             raise ValueError(f"Unsupported dialect '{backend}' for URL: {conn_url}")
+
+    def engine_kwargs(self) -> dict[str, Any]:
+        """Return the ``create_engine`` options this connection needs beyond
+        its URL.
+
+        pyodbc otherwise sends an execute-many one round trip per row, so
+        ``fast_executemany`` is turned on to bind the records as parameter
+        arrays instead; the other drivers already batch natively. An empty
+        driver name means SQLAlchemy's default, which is pyodbc for MSSQL.
+        """
+        if self.dialect is DialectTypes.MSSQL and self.con_url.get_driver_name() in ("", "pyodbc"):
+            return {"fast_executemany": True}
+
+        return {}
 
     def get_script_dir(self) -> Path:
         """Return the SQL script directory, resolving and caching it on first use.

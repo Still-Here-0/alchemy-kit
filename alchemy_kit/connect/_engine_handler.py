@@ -6,7 +6,7 @@ import sqlalchemy
 
 from ..resources._sql import SQL
 from ..types._sql_parameters import SqlParamMap
-from ..types.sql_types import SQL_EXPAND_CLASSES
+from ..types.sql_types import SQL_EXPAND_CLASSES, SqlParamType
 from ._info import ConnectionInfo
 
 
@@ -46,7 +46,10 @@ class EngineHandler:
     def run_sql(self, sql: SQL) -> tuple[int | None, pd.DataFrame]:
         """Run one statement on its own connection and return its
         ``(row_count, DataFrame)`` pair; ``f_check`` gates commit vs
-        rollback (``(None, empty)`` on rollback)."""
+        rollback (``(None, empty)`` on rollback).
+
+        A statement bound to an empty record list executes zero times and is
+        reported as ``(0, empty)``."""
         with self._engine.connect() as conn:
             result = self._execute_sql(conn, sql)
 
@@ -54,7 +57,7 @@ class EngineHandler:
                 conn.rollback()
                 return None, pd.DataFrame()
 
-            row_count, data = self._collect_result(result)
+            row_count, data = self._collect_result(result, sql)
             conn.commit()
             return row_count, data
 
@@ -65,7 +68,8 @@ class EngineHandler:
 
         The shared connection keeps session state (e.g. temporary tables)
         alive across statements; the first failing ``f_check`` rolls back
-        everything.
+        everything. A statement bound to an empty record list executes zero
+        times and is reported as ``(0, empty)`` without leaving the batch.
         """
         results: list[tuple[int | None, pd.DataFrame]] = []
 
@@ -77,13 +81,15 @@ class EngineHandler:
                     conn.rollback()
                     return [(None, pd.DataFrame()) for _ in range(len(results) + 1)]
 
-                results.append(self._collect_result(result))
+                results.append(self._collect_result(result, sql))
 
             conn.commit()
 
         return results
 
-    def _execute_sql(self, conn: sqlalchemy.Connection, sql: SQL) -> sqlalchemy.CursorResult:
+    def _execute_sql(self, conn: sqlalchemy.Connection, sql: SQL) -> sqlalchemy.CursorResult | None:
+        """Execute ``sql``, or return ``None`` when it binds an empty record
+        list and therefore executes zero times."""
         if sql.script_dir is None and sql.sql_path is not None:
             sql.set_script_dir(self._con_info.get_script_dir())
 
@@ -93,25 +99,74 @@ class EngineHandler:
         if isinstance(sql.query_parameters, Mapping):
             return self._execute_with_binded_parameters(conn, query, sql.query_parameters)
 
-        return conn.execute(query, sql.query_parameters)
+        if not sql.query_parameters:
+            return None
+
+        return self._execute_with_binded_records(conn, query, sql.query_parameters)
 
     @staticmethod
-    def _collect_result(result: sqlalchemy.CursorResult) -> tuple[int | None, pd.DataFrame]:
+    def _collect_result(result: sqlalchemy.CursorResult | None, sql: SQL) -> tuple[int | None, pd.DataFrame]:
+        """Collect ``(row_count, DataFrame)`` from an execution.
+
+        A driver batching an execute-many often reports no row count at all
+        (pyodbc's ``fast_executemany`` returns ``-1``); the number of records
+        sent is reported instead, since the statement ran once per record.
+        """
+        if result is None:
+            return 0, pd.DataFrame()
+
         data = pd.DataFrame()
         if result.returns_rows:
             data = pd.DataFrame(result.fetchall(), columns=list(result.keys()))
-        return result.rowcount, data
+
+        row_count = result.rowcount
+        if row_count is not None and row_count < 0 and not isinstance(sql.query_parameters, Mapping):
+            row_count = len(sql.query_parameters)
+
+        return row_count, data
 
     def _execute_with_binded_parameters(self, conn: sqlalchemy.Connection, query: sqlalchemy.TextClause, parameters: SqlParamMap) -> sqlalchemy.CursorResult:
         binds = [
             sqlalchemy.bindparam(key, value, expanding=isinstance(value, SQL_EXPAND_CLASSES))
             for key, value in parameters.items()
         ]
-
         binded_query = query.bindparams(*binds) if binds else query
 
         return conn.execute(binded_query)
-    
+
+    def _execute_with_binded_records(self, conn: sqlalchemy.Connection, query: sqlalchemy.TextClause, records: Sequence[SqlParamMap]) -> sqlalchemy.CursorResult:
+        """Execute the statement once per record.
+
+        Binds are never expanding here: SQLAlchemy rejects expanding parameters
+        under execute-many, and a collection in a record is array data for one
+        column rather than an ``IN`` list.
+        """
+        binds = [
+            sqlalchemy.bindparam(key, value)
+            for key, value in self._record_bind_values(records).items()
+        ]
+        binded_query = query.bindparams(*binds) if binds else query
+
+        return conn.execute(binded_query, list(records))
+
+    @staticmethod
+    def _record_bind_values(records: Sequence[SqlParamMap]) -> dict[str, SqlParamType]:
+        """Pick the value each key is typed from — the first non-null one any
+        record holds — so execute-many binds are typed the way a single
+        mapping's are."""
+        keys = set(records[0])
+        found: dict[str, SqlParamType] = {}
+
+        for record in records:
+            for key, value in record.items():
+                if value is not None and key not in found:
+                    found[key] = value
+
+            if len(found) == len(keys):
+                break
+
+        return {key: found.get(key) for key in records[0]}
+
     def insert_data(
         self,
         data: pd.DataFrame,

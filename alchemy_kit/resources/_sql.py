@@ -48,19 +48,19 @@ class SQL:
 
         return full_file_path.resolve()
 
+    def parameter_names(self) -> list[str]:
+        """Return the names this statement binds, whether the parameters are a
+        single mapping or a list of records (one execution's worth of names)."""
+        if isinstance(self.query_parameters, Mapping):
+            return list(self.query_parameters.keys())
+
+        return list(self.query_parameters[0].keys()) if self.query_parameters else []
+
     def _convert_parameters(self, query: str) -> str:
         if "@" not in query:
             return query
 
-        parameters: list[str]
-        if isinstance(self.query_parameters, Mapping):
-            parameters = list(self.query_parameters.keys())
-        elif self.query_parameters:
-            parameters = list(self.query_parameters[0].keys())
-        else:
-            parameters = []
-
-        for param in parameters:
+        for param in self.parameter_names():
             pattern = rf"@{re.escape(param)}\b"
             replace = f":{param}"
             query = re.sub(pattern, replace, query)

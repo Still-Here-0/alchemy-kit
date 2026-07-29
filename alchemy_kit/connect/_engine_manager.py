@@ -89,7 +89,7 @@ class EngineManager(AbstractContextManager):
         if self.engine_exists(con_info.unique_id):
             raise ValueError(f"Engine with unique id '{con_info.unique_id}' aready exists")
 
-        engine = sqlalchemy.create_engine(con_info.con_url)
+        engine = sqlalchemy.create_engine(con_info.con_url, **con_info.engine_kwargs())
         self._engine_pool[con_info.unique_id] = _EngineInfo(engine, con_info, [])
 
         return self.get_handler(con_info.unique_id)

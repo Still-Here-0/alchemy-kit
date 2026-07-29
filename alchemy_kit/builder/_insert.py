@@ -3,7 +3,7 @@ from typing import Any, cast
 
 import pandas as pd
 import sqlalchemy as sa
-from sqlalchemy.sql.expression import Insert
+from sqlalchemy.sql.expression import ClauseElement, Insert
 
 from ..model.units import ColumnUnit, ObjectUnit
 from ..resources._pandas import none_if_na
@@ -34,12 +34,14 @@ class InsertBuilder(SqlBuilder):
 
         self._table = selectable
         self._stmt: Insert = sa.insert(selectable)
+        self._record_names: list[str] | None = None
 
-    def _with(self, stmt: Insert) -> "InsertBuilder":
+    def _with(self, stmt: Insert, record_names: list[str] | None = None) -> "InsertBuilder":
         clone = InsertBuilder.__new__(InsertBuilder)
         SqlBuilder.__init__(clone, self._base, self._handler)
         clone._table = self._table
         clone._stmt = stmt
+        clone._record_names = record_names if record_names is not None else self._record_names
         return clone
 
     def _statement(self) -> Insert:
@@ -53,9 +55,8 @@ class InsertBuilder(SqlBuilder):
         """Return the values to insert, keyed by SQL column name: a dict for
         :meth:`from_values`, one dict per row for :meth:`from_dataframe`
         (empty for select inserts)."""
-        if multi_values := self._stmt._multi_values:
-            rows = cast("tuple[Sequence[dict[str, SqlScalarType]], ...]", multi_values)
-            return [dict(row) for group in rows for row in group]
+        if (records := self._records({})) is not None:
+            return cast("list[dict[str, SqlScalarType]]", records)
 
         if not (values := self._stmt._values):
             return {}
@@ -89,16 +90,24 @@ class InsertBuilder(SqlBuilder):
         df: pd.DataFrame,
         columns: Sequence[str] | None = None,
     ) -> "InsertBuilder":
-        """Insert every row of ``df`` as one multi-row ``INSERT``;
-        ``columns`` selects and orders which columns (all when omitted)."""
+        """Insert every row of ``df`` as one bound record per row; ``columns``
+        selects and orders which columns (all when omitted).
+
+        The target column names are kept even when ``df`` holds no rows, so an
+        empty frame still compiles to the statement it would have run.
+        """
         source = list(df.columns) if columns is None else list(columns)
         target = {name: self._sql_name(name) for name in source}
-        
+
         rows = [
             {target[name]: ColumnUnit._value_operand(none_if_na(record[name])) for name in source}
             for record in df.to_dict(orient="records")
         ]
-        return self._with(self._stmt.values(rows))
+        names = list(target.values())
+
+        if not rows:
+            return self._with(self._stmt, names)
+        return self._with(self._stmt.values(rows), names)
 
     def from_select(
         self,
@@ -119,33 +128,154 @@ class InsertBuilder(SqlBuilder):
 
         return self._with(self._stmt.from_select(names, stmt))
 
+    def to_sql(self, **parameters: Any) -> SQL:
+        """Compile the insert into a single :class:`SQL`.
+
+        A multi-row insert compiles to a one-row ``INSERT`` template carrying
+        every row as a bound record, executed once against the whole list. The
+        statement binds one row's worth of parameters whatever the row count,
+        so no dialect's per-statement parameter limit applies to it.
+        """
+        records = self._records(parameters)
+
+        if records is None:
+            return super().to_sql(**parameters)
+
+        return self._checked(SQL(
+            raw_query=self._record_template(records),
+            query_parameters=records,
+        ))
+
+    def render(self) -> str:
+        """Return the one-row ``INSERT`` template ``to_sql`` binds the records
+        to, rather than the multi-row ``VALUES`` statement Core would compile."""
+        records = self._records({})
+
+        if records is None:
+            return super().render()
+        return self._record_template(records)
+
+    def _rows(self) -> list[dict[str, Any]] | None:
+        """Return one validated row per inserted row in a stable column order,
+        or ``None`` when the statement is not a multi-row value insert and
+        compiles on its own."""
+        rows = cast(
+            "list[dict[str, Any]]",
+            [row for group in self._stmt._multi_values for row in group],
+        )
+
+        if not rows:
+            return [] if self._record_names else None
+
+        names = list(rows[0])
+        self._check_bindable(rows[0])
+
+        expected = rows[0].keys()
+        for position, row in enumerate(rows):
+            if row.keys() != expected:
+                raise ValueError(
+                    f"every inserted row must set the same columns; row {position}"
+                    f" sets {sorted(row)} but the first sets {sorted(names)}"
+                )
+
+        return [{name: row[name] for name in names} for row in rows]
+
+    def _records(self, parameters: dict[str, Any]) -> list[dict[str, Any]] | None:
+        """Return one bound record per row, or ``None`` when the statement is
+        not a multi-row value insert and compiles on its own."""
+        rows = self._rows()
+
+        if rows is None or not parameters:
+            return rows
+        return [row | parameters for row in rows]
+
+    @staticmethod
+    def _check_bindable(row: dict[str, Any]) -> None:
+        for name, value in row.items():
+            if isinstance(value, ClauseElement):
+                raise TypeError(
+                    f"column {name!r} is set to a SQL expression, which cannot be"
+                    " bound as a value; insert expressions with from_values or"
+                    " from_select instead"
+                )
+
+    def _record_template(self, records: Sequence[dict[str, Any]]) -> str:
+        names = list(records[0]) if records else cast("list[str]", self._record_names)
+        compiled = sa.insert(self._table).values(
+            {name: sa.bindparam(name) for name in names}
+        ).compile(dialect=self._sa_dialect())
+
+        return str(compiled)
+
     def to_sqls(
         self,
         *,
         chunk_size: int | None = None,
         **parameters: Any,
     ) -> list[SQL]:
-        """Compile the insert into one or more dialect-safe SQL statements.
+        """Compile the insert into multi-row ``INSERT ... VALUES`` statements,
+        each carrying as many rows as the dialect's row cap and parameter budget
+        allow, narrowed further by ``chunk_size``.
 
-        Multi-row inserts are split according to the dialect's row and
-        parameter limits, further restricted by ``chunk_size`` when given.
+        Run the list through ``EngineHandler.run_sqls`` to keep the whole insert
+        in one transaction. A dialect with no multi-row ``VALUES`` support
+        raises; :meth:`to_sql` inserts any row count there.
         """
-        rows = [row for group in self._stmt._multi_values for row in group]
-        effective = self._effective_chunk_size(chunk_size, rows)
+        rows = self._rows()
 
-        if effective is None or len(rows) <= effective:
-            return [super().to_sql(**parameters)]
+        if not rows:
+            return [self.to_sql(**parameters)]
+
+        if not self._sa_dialect().supports_multivalues_insert:
+            raise ValueError(
+                f"{self._handler._con_info.dialect} cannot carry several rows in"
+                " one VALUES clause; use to_sql, which binds every row to a"
+                " single statement instead"
+            )
+
+        size = self._chunk_rows(chunk_size, rows)
 
         return [
-            self._chunk_sql(rows[start:start + effective], parameters)
-            for start in range(0, len(rows), effective)
+            self._values_sql(rows[start:start + size], parameters)
+            for start in range(0, len(rows), size)
         ]
 
+    def _chunk_rows(self, chunk_size: int | None, rows: Sequence[dict[str, Any]]) -> int:
+        """Rows one statement may carry: the dialect's row cap and parameter
+        budget, narrowed by ``chunk_size``."""
+        if chunk_size is not None and chunk_size < 1:
+            raise ValueError(f"chunk_size must be at least 1, got {chunk_size}")
+
+        limits = get_map(self._handler._con_info.dialect).limits
+        caps = [cap for cap in (chunk_size, limits.max_values_rows) if cap is not None]
+
+        if columns := len(rows[0]):
+            caps.append(limits.param_budget // columns)
+
+        return max(1, min(caps, default=len(rows)))
+
+    def _values_sql(self, chunk: Sequence[dict[str, Any]], parameters: dict[str, Any]) -> SQL:
+        compiled = sa.insert(self._table).values(list(chunk)).compile(
+            dialect=self._sa_dialect(),
+            compile_kwargs={"render_postcompile": True},
+        )
+
+        return self._checked(SQL(
+            raw_query=str(compiled),
+            query_parameters={**(compiled.params or {}), **parameters},
+        ))
+
     def run(self, *, chunk_size: int | None = None, **parameters: Any) -> tuple[int | None, pd.DataFrame]:
-        """Execute the insert; a multi-row ``from_dataframe`` insert that would
-        exceed the dialect's per-statement row/parameter limits (or
-        ``chunk_size`` when given) is split into chunks run in one
-        all-or-nothing transaction."""
+        """Execute the insert, returning its ``(row_count, DataFrame)`` pair.
+
+        Without ``chunk_size`` the insert runs as the one statement
+        :meth:`to_sql` compiles, bound once per row; with it the rows are split
+        into the multi-row statements :meth:`to_sqls` compiles, run in one
+        all-or-nothing transaction.
+        """
+        if chunk_size is None:
+            return super().run(**parameters)
+
         sqls = self.to_sqls(chunk_size=chunk_size, **parameters)
 
         if len(sqls) == 1:
@@ -156,36 +286,3 @@ class InsertBuilder(SqlBuilder):
         if any(count is None for count in counts):
             return None, pd.DataFrame()
         return sum(cast("list[int]", counts)), pd.DataFrame()
-
-    def _effective_chunk_size(self, chunk_size: int | None, rows: Sequence[Any]) -> int | None:
-        if not rows:
-            return None
-
-        limits = get_map(self._handler._con_info.dialect)
-        caps: list[int] = []
-        if limits.max_insert_rows is not None:
-            caps.append(limits.max_insert_rows)
-        if limits.max_statement_params is not None:
-            caps.append(limits.max_statement_params // len(rows[0]))
-
-        safe_max = min(caps) if caps else None
-
-        if chunk_size is None:
-            return safe_max
-        if safe_max is None:
-            return chunk_size
-        return min(chunk_size, safe_max)
-
-    def _chunk_sql(
-        self,
-        chunk: Sequence[Any],
-        parameters: dict[str, Any],
-    ) -> SQL:
-        compiled = sa.insert(self._table).values(list(chunk)).compile(
-            dialect=self._sa_dialect(),
-            compile_kwargs={"render_postcompile": True},
-        )
-        return SQL(
-            raw_query=str(compiled),
-            query_parameters={**(compiled.params or {}), **parameters},
-        )

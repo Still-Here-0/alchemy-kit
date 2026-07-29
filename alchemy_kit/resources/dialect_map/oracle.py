@@ -8,6 +8,7 @@ from sqlalchemy.types import INTEGER, NullType, SMALLINT
 from ._base import ColumnLike, DialectMap, SaTypeFactory
 from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import OracleTypeParameters
+from ...types.statement_limits import StatementLimits
 
 
 class OracleMap(DialectMap[OracleTypeParameters]):
@@ -123,6 +124,7 @@ class OracleMap(DialectMap[OracleTypeParameters]):
     _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
     dialect = DialectTypes.ORACLE
     dialect_paramaters = frozenset(get_args(OracleTypeParameters))
+    limits = StatementLimits(max_params=65535)
 
     @classmethod
     def render_type(cls, column: ColumnLike) -> str:

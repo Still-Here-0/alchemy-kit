@@ -7,6 +7,7 @@ from alchemy_kit.connect._engine_handler import EngineHandler
 from alchemy_kit.model.units import OperandUnit
 from alchemy_kit.resources.dialect_map import get_sa_dialect
 from alchemy_kit.types.dialect_types import DialectTypes
+from alchemy_kit.types.errors import StatementLimitError
 
 from _helpers import MSSQL_HANDLER, SQLITE_HANDLER, items, mssql_items, parts
 
@@ -566,3 +567,36 @@ def test_paginate_runs(handler: EngineHandler):
     assert page(1) == ["a", "b"]
     assert page(2) == ["c", "d"]
     assert page(3) == ["e"]
+
+
+def test_oversized_is_in_list_raises_before_the_server_does():
+    i = MSSQL_HANDLER.get_unit(mssql_items)
+    select = SelectBuilder(i.id_1, from_=i).where(i.id_1.is_in(list(range(3000))))
+
+    with pytest.raises(StatementLimitError) as error:
+        select.to_sql()
+
+    assert error.value.needed == 3000
+    assert error.value.budget == 2098
+    assert "TempBuilder" in str(error.value)
+
+
+def test_statement_at_the_parameter_budget_still_compiles():
+    i = MSSQL_HANDLER.get_unit(mssql_items)
+    select = SelectBuilder(i.id_1, from_=i).where(i.id_1.is_in(list(range(2098))))
+
+    assert len(select.to_sql().query_parameters) == 2098
+
+
+def test_render_shows_an_oversized_statement_to_sql_would_reject():
+    i = MSSQL_HANDLER.get_unit(mssql_items)
+    select = SelectBuilder(i.id_1, from_=i).where(i.id_1.is_in(list(range(3000))))
+
+    assert "SELECT" in select.render()
+
+
+def test_sqlite_headroom_accepts_a_list_mssql_rejects():
+    i = SQLITE_HANDLER.get_unit(items)
+    select = SelectBuilder(i.id_1, from_=i).where(i.id_1.is_in(list(range(3000))))
+
+    assert len(select.to_sql().query_parameters) == 3000

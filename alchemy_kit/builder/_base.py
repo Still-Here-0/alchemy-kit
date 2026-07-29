@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Any
 
 import pandas as pd
@@ -11,7 +12,8 @@ from ..model.base_model import BaseModel
 from ..model.units._column_unit import _ExpressionUnit
 from ..model.units._object_unit import ObjectUnit
 from ..resources._sql import SQL
-from ..resources.dialect_map import get_sa_dialect
+from ..resources.dialect_map import get_map, get_sa_dialect
+from ..types.errors import StatementLimitError
 
 
 class SqlBuilder(ABC):
@@ -47,14 +49,38 @@ class SqlBuilder(ABC):
         arguments supply or override bound parameters."""
         compiled = self._compile()
 
-        return SQL(
+        return self._checked(SQL(
             raw_query=str(compiled),
             query_parameters={**(compiled.params or {}), **parameters},
-        )
+        ))
+
+    def _checked(self, sql: SQL) -> SQL:
+        """Return ``sql`` once its statement fits the dialect's parameter
+        budget, raising :class:`StatementLimitError` when it does not."""
+        dialect = self._handler._con_info.dialect
+        budget = get_map(dialect).limits.param_budget
+        needed = len(sql.parameter_names())
+
+        if needed <= budget:
+            return sql
+
+        if isinstance(sql.query_parameters, Mapping):
+            remedy = (
+                "bind fewer values — a long value list is better staged into a"
+                " temporary table with TempBuilder and joined"
+            )
+        else:
+            remedy = (
+                "the target binds more columns than the dialect allows in one"
+                " statement; write fewer columns at a time"
+            )
+
+        raise StatementLimitError(dialect, needed, budget, remedy)
 
     def render(self) -> str:
-        """Return the SQL string exactly as ``run`` would execute it, with
-        ``:name`` placeholders for bound values."""
+        """Return the compiled SQL string with ``:name`` placeholders for bound
+        values, for inspection; it does not check the dialect's parameter
+        budget the way ``to_sql`` does."""
         return str(self._compile())
 
     def run(self, **parameters: Any) -> tuple[int | None, pd.DataFrame]:

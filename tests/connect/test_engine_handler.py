@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Any, cast
 
 import pandas as pd
@@ -52,3 +53,96 @@ def test_insert_data_appends_and_commits(handler: EngineHandler):
 
     _, df = handler.run_sql(SQL(raw_query="SELECT * FROM items ORDER BY id"))
     assert df["name"].tolist() == ["a", "b"]
+
+
+def test_record_parameters_are_typed_like_a_single_mapping(handler: EngineHandler):
+    counts = handler.run_sqls([
+        SQL(raw_query="CREATE TEMPORARY TABLE priced (label TEXT, amount NUMERIC)"),
+        SQL(
+            raw_query="INSERT INTO priced (label, amount) VALUES (:label, :amount)",
+            query_parameters=[
+                {"label": "a", "amount": Decimal("1.50")},
+                {"label": "b", "amount": Decimal("2.25")},
+            ],
+        ),
+        SQL(raw_query="SELECT sum(amount) AS total FROM priced"),
+    ])
+
+    assert counts[1][0] == 2
+    assert counts[-1][1]["total"].tolist() == [3.75]
+
+
+def test_records_are_typed_from_the_first_one_holding_a_value(handler: EngineHandler):
+    counts = handler.run_sqls([
+        SQL(raw_query="CREATE TEMPORARY TABLE priced (label TEXT, amount NUMERIC)"),
+        SQL(
+            raw_query="INSERT INTO priced (label, amount) VALUES (:label, :amount)",
+            query_parameters=[
+                {"label": "a", "amount": None},
+                {"label": "b", "amount": Decimal("2.25")},
+            ],
+        ),
+        SQL(raw_query="SELECT count(amount) AS filled FROM priced"),
+    ])
+
+    assert counts[1][0] == 2
+    assert counts[-1][1]["filled"].tolist() == [1]
+
+
+def test_an_empty_record_list_executes_zero_times(handler: EngineHandler):
+    counts = handler.run_sqls([
+        SQL(raw_query="CREATE TEMPORARY TABLE priced (label TEXT, amount NUMERIC)"),
+        SQL(
+            raw_query="INSERT INTO priced (label, amount) VALUES (:label, :amount)",
+            query_parameters=[],
+        ),
+        SQL(raw_query="SELECT count(*) AS stored FROM priced"),
+    ])
+
+    assert counts[1][0] == 0
+    assert counts[1][1].empty
+    assert counts[-1][1]["stored"].tolist() == [0]
+
+
+def test_run_sql_reports_an_empty_record_list_as_no_rows(handler: EngineHandler):
+    handler.run_sql(SQL(raw_query="CREATE TABLE priced (label TEXT)"))
+
+    count, data = handler.run_sql(
+        SQL(raw_query="INSERT INTO priced (label) VALUES (:label)", query_parameters=[])
+    )
+
+    assert count == 0
+    assert data.empty
+
+
+def test_records_carrying_a_collection_bind_as_column_data(handler: EngineHandler):
+    counts = handler.run_sqls([
+        SQL(raw_query="CREATE TEMPORARY TABLE tagged (label TEXT, tags TEXT)"),
+        SQL(
+            raw_query="INSERT INTO tagged (label, tags) VALUES (:label, :tags)",
+            query_parameters=[
+                {"label": "a", "tags": "['x', 'y']"},
+                {"label": "b", "tags": "[]"},
+            ],
+        ),
+        SQL(raw_query="SELECT tags FROM tagged ORDER BY label"),
+    ])
+
+    assert counts[1][0] == 2
+    assert counts[-1][1]["tags"].tolist() == ["['x', 'y']", "[]"]
+
+
+def test_a_mapping_statement_still_expands_a_list_into_an_in_clause(handler: EngineHandler):
+    counts = handler.run_sqls([
+        SQL(raw_query="CREATE TEMPORARY TABLE tagged (label TEXT)"),
+        SQL(
+            raw_query="INSERT INTO tagged (label) VALUES (:label)",
+            query_parameters=[{"label": "a"}, {"label": "b"}, {"label": "c"}],
+        ),
+        SQL(
+            raw_query="SELECT label FROM tagged WHERE label IN :wanted ORDER BY label",
+            query_parameters={"wanted": ["a", "c"]},
+        ),
+    ])
+
+    assert counts[-1][1]["label"].tolist() == ["a", "c"]

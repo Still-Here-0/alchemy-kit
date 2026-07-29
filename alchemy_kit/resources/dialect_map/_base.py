@@ -6,6 +6,7 @@ import sqlalchemy as sa
 
 from ...types.dialect_types import DialectTypes
 from ...types.py_type_parameters import PyTypeParameters
+from ...types.statement_limits import StatementLimits
 
 type SaTypeFactory = Callable[[], sa.types.TypeEngine[Any]]
 
@@ -60,8 +61,7 @@ class DialectMap[_TypeParameters: str](ABC):
     _quote_open: ClassVar[str] = '"'
     _quote_close: ClassVar[str] = '"'
 
-    max_insert_rows: ClassVar[int | None] = None
-    max_statement_params: ClassVar[int | None] = None
+    limits: ClassVar[StatementLimits]
 
     @classmethod
     def quote_identifier(cls, name: str) -> str:
