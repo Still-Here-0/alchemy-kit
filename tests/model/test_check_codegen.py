@@ -64,6 +64,7 @@ def orders_model() -> ObjectModel:
 
 def _build(orders_model: ObjectModel, tmp_path: Path) -> str:
     builder = PyFileBuilder(
+        db_name="app_db",
         schema_name="dbo",
         class_name="orders",
         file_path=tmp_path / "orders_MODULE.py",
@@ -131,6 +132,7 @@ def test_no_checks_generates_clean_file(tmp_path: Path):
     obj.columns["id"] = _column("id", "int")
 
     builder = PyFileBuilder(
+        db_name="app_db",
         schema_name="dbo",
         class_name="plain",
         file_path=tmp_path / "plain_MODULE.py",

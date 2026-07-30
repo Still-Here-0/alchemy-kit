@@ -63,3 +63,5 @@ def test_engine_kwargs_enable_fast_executemany_for_pyodbc():
 def test_engine_kwargs_are_empty_for_drivers_that_batch_natively():
     for url in ("mssql+pymssql://", "postgresql+psycopg://", "oracle+oracledb://", "sqlite://"):
         assert ConnectionInfo(sqlalchemy.make_url(url)).engine_kwargs() == {}
+
+

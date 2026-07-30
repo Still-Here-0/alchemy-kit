@@ -66,6 +66,7 @@ def test_build_model_generates_callable_module(tmp_path: Path):
 
     py_text = py_path.read_text()
     assert "class sync_orders(CallableModel[MssqlTypeParameters]):" in py_text
+    assert "db_name='testdb'" in py_text
     assert "reference_name='[dbo].[sync_orders]'" in py_text
     assert "'name': 'p_id'" in py_text and "'mode': 'IN'" in py_text
 
@@ -108,6 +109,7 @@ def test_no_parameter_procedure(tmp_path: Path):
 class _sync(CallableModel[str]):
     class Config(CallableModel.Config):
         metadata = CallMetaData(
+            db_name="app_db",
             schema_name="app",
             name="sync",
             reference_name="`app`.`sync`",

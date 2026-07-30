@@ -9,6 +9,7 @@ from sqlalchemy.engine.interfaces import ReflectedCheckConstraint, ReflectedUniq
 from sqlalchemy.exc import NoSuchTableError
 
 from ...connect._engine_handler import EngineHandler
+from ...resources._pandas import none_if_na
 from ...resources._sql import SQL
 from ...resources.dialect_map import DialectMap, ReflectedTypeFacts, get_map
 from ...types.dialect_types import DialectTypes
@@ -56,6 +57,15 @@ _UNIQUE_CONSTRAINTS_FALLBACK_SQL: dict[DialectTypes, str] = {
 
 _CHECK_CONSTRAINTS_FALLBACK_SQL: dict[DialectTypes, str] = {
     DialectTypes.MSSQL: "mssql_check_constraints",
+}
+
+_CURRENT_DATABASE_SQL: dict[DialectTypes, str] = {
+    DialectTypes.MSSQL: "SELECT DB_NAME()",
+    DialectTypes.POSTGRESQL: "SELECT current_database()",
+    DialectTypes.MYSQL: "SELECT DATABASE()",
+    DialectTypes.MARIADB: "SELECT DATABASE()",
+    DialectTypes.ORACLE: "SELECT SYS_CONTEXT('USERENV', 'DB_NAME') FROM dual",
+    DialectTypes.SQLITE: "SELECT file FROM pragma_database_list() WHERE name = 'main'",
 }
 
 
@@ -293,6 +303,24 @@ class MetadataExtractor:
             "parameter_name", "sql_type", "is_nullable", "mode", "ordinal",
         ])
         return ListParameters.validate(df)
+
+    def current_database(self) -> str | None:
+        """Return the database the reflected objects live in, as the connection
+        itself reports it.
+
+        Reflection only ever sees the database the connection is attached to, so
+        that is the one the objects belong to — not whatever the URL happens to
+        name, which may be a different initial catalog, a DSN, or nothing at
+        all. ``None`` when the connection has no named database, as an in-memory
+        SQLite has.
+        """
+        _, data = self._handler.run_sql(SQL(raw_query=_CURRENT_DATABASE_SQL[self._dialect]))
+
+        if data.empty:
+            return None
+
+        name = none_if_na(data.iat[0, 0])
+        return str(name) if name else None
 
     def _reflect_procedure_names(self, schema_name: str) -> list[str]:
         if self._dialect not in _INFO_SCHEMA_ROUTINE_DIALECTS:

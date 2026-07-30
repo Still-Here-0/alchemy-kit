@@ -24,6 +24,7 @@ class orders(BaseModel):
 
     class Config(BaseModel.Config):
         metadata = MetaData(
+            db_name=None,
             schema_name="main",
             obj_name="orders",
             obj_type="Table",

@@ -160,9 +160,15 @@ class _UnreflectableInspector:
 
 
 class _FallbackHandler:
-    def __init__(self, dialect: DialectTypes, results: dict[str, pd.DataFrame]):
+    def __init__(
+        self,
+        dialect: DialectTypes,
+        results: dict[str, pd.DataFrame],
+        raw_result: pd.DataFrame | None = None,
+    ):
         self._con_info = SimpleNamespace(dialect=dialect)
         self._results = results
+        self._raw_result = pd.DataFrame() if raw_result is None else raw_result
         self.executed: list = []
 
     def get_inspector(self):
@@ -171,6 +177,10 @@ class _FallbackHandler:
     def run_sql(self, sql):
         sql.process_query()
         self.executed.append(sql)
+
+        if sql.sql_path is None:
+            return len(self._raw_result), self._raw_result
+
         key = "check" if "check_constraints" in str(sql.sql_path) else "unique"
         data = self._results[key]
         return len(data), data
@@ -224,3 +234,32 @@ def test_fallback_degrades_to_empty_without_dialect_sql():
     assert extractor.list_check_constraints("app", "users").empty
     assert extractor._get_single_column_uniques("app", "users") == set()
     assert handler.executed == []
+
+
+def test_parse_db_names_the_database_the_objects_live_in(sqlite_info: ConnectionInfo, tmp_path: Path):
+    model = parse_db(sqlite_info, SchemaConfig(), LOGGER)
+
+    assert model.name == str(tmp_path / "fixture.db")
+
+
+def test_current_database_is_none_without_a_named_database():
+    engine = sqlalchemy.create_engine("sqlite://")
+    handler = EngineHandler(engine, ConnectionInfo(sqlalchemy.make_url("sqlite://")))
+
+    assert MetadataExtractor(handler).current_database() is None
+
+
+def test_current_database_ignores_the_url_and_asks_the_connection():
+    url = sqlalchemy.make_url("mssql+pyodbc://host/master")
+    handler = _FallbackHandler(DialectTypes.MSSQL, {}, pd.DataFrame({"": ["sales_db"]}))
+
+    assert url.database == "master"
+    assert MetadataExtractor(cast(EngineHandler, handler)).current_database() == "sales_db"
+    assert handler.executed[0].raw_query == "SELECT DB_NAME()"
+
+
+@pytest.mark.parametrize("dialect", list(DialectTypes))
+def test_every_dialect_can_be_asked_for_its_database(dialect: DialectTypes):
+    handler = _FallbackHandler(dialect, {}, pd.DataFrame({"": ["some_db"]}))
+
+    assert MetadataExtractor(cast(EngineHandler, handler)).current_database() == "some_db"

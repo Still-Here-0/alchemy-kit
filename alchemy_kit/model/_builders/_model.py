@@ -47,6 +47,7 @@ def build_model(model: DBModel, result_dir: Path, logger: BetterLogger, group_by
 
             object_py = object_path.with_suffix(".py")
             py_builder = PyFileBuilder(
+                db_name=model.name,
                 schema_name=schema_name,
                 class_name=valid_obj_name,
                 file_path=object_py,
@@ -78,6 +79,7 @@ def build_model(model: DBModel, result_dir: Path, logger: BetterLogger, group_by
             procedure_path = procedure_dir / valid_module_name
 
             _ = CallablePyFileBuilder(
+                db_name=model.name,
                 schema_name=schema_name,
                 class_name=valid_proc_name,
                 file_path=procedure_path.with_suffix(".py"),

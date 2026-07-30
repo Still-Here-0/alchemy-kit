@@ -116,6 +116,7 @@ def test_build_generates_package(monkeypatch: pytest.MonkeyPatch):
     assert (result_dir / "audit" / "__init__.py").read_text().strip() == "from .users_MODULE import users"
 
     orders_py = (result_dir / "dbo" / "orders_MODULE.py").read_text()
+    assert "db_name='testdb'" in orders_py
     assert "gt=0.0" in orders_py
     assert "isin=['open', 'closed']" in orders_py
     assert "@pa.dataframe_check(description='CK_orders_dates')" in orders_py

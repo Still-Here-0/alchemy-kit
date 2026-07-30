@@ -37,11 +37,11 @@ def clear_dir(dir: Path):
                 item.unlink()
 
 def parse_db(conn_info: ConnectionInfo, schema_conf: SchemaConfig, logger: BetterLogger) -> DBModel:
-    db = DBModel(conn_info.con_url.database, conn_info.dialect)
-    
     with EngineManager(None) as manager:
         handler = manager.create_engine(conn_info)
         extractor = MetadataExtractor(handler)
+        db = DBModel(extractor.current_database(), conn_info.dialect)
+
         schema_data = extractor.list_schemas(schema_conf)
         for _, row in schema_data.iterrows():
             schema_name: str = row[ListSchemas.name]

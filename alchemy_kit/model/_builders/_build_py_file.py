@@ -21,6 +21,7 @@ class PyFileBuilder:
     identifiers: Identifiers = field(default_factory=Identifiers, init=False, repr=False)
     column_names: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
+    db_name: str | None
     schema_name: str
     class_name: str
     file_path: Path
@@ -235,6 +236,7 @@ class PyFileBuilder:
 
     def _get_object_metadata(self, unparsed_checks: dict[str, str], unparsed_indexes: dict[str, str]) -> str:
         metadata = []
+        metadata.append(f"db_name={self.db_name!r}")
         metadata.append(f"schema_name={self.schema_name!r}")
         metadata.append(f"obj_name={self.object_model.name!r}")
         metadata.append(f"obj_type={self.object_model.type!r}")

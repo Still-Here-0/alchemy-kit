@@ -10,8 +10,13 @@ class ForeignKeyMeta(TypedDict):
 
 
 class MetaData(TypedDict):
-    """Identifying metadata for the SQL object a model represents."""
+    """Identifying metadata for the SQL object a model represents.
 
+    ``db_name`` is ``None`` when the connection URL the model was built from
+    names no database (a DSN, or an in-memory SQLite).
+    """
+
+    db_name: str | None
     schema_name: str
     obj_name: str
     obj_type: str
@@ -31,8 +36,13 @@ class CallParameter(TypedDict):
 
 
 class CallMetaData(TypedDict):
-    """Identifying metadata for the stored procedure a callable model represents."""
+    """Identifying metadata for the stored procedure a callable model represents.
 
+    ``db_name`` is ``None`` when the connection URL the model was built from
+    names no database (a DSN, or an in-memory SQLite).
+    """
+
+    db_name: str | None
     schema_name: str
     name: str
     reference_name: str

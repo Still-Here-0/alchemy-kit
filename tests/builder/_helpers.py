@@ -17,7 +17,7 @@ class items(BaseModel[SqliteTypeParameters]):
 
     class Config(BaseModel.Config):
         metadata = MetaData(
-            schema_name="main", obj_name="items", obj_type="Table",
+            db_name=None, schema_name="main", obj_name="items", obj_type="Table",
             reference_name='"main"."items"', description=None,
         )
 
@@ -28,7 +28,7 @@ class parts(BaseModel[SqliteTypeParameters]):
 
     class Config(BaseModel.Config):
         metadata = MetaData(
-            schema_name="main", obj_name="parts", obj_type="Table",
+            db_name=None, schema_name="main", obj_name="parts", obj_type="Table",
             reference_name='"main"."parts"', description=None,
         )
 
@@ -38,7 +38,7 @@ class mssql_items(BaseModel[MssqlTypeParameters]):
 
     class Config(BaseModel.Config):
         metadata = MetaData(
-            schema_name="dbo", obj_name="items", obj_type="Table",
+            db_name="app_db", schema_name="dbo", obj_name="items", obj_type="Table",
             reference_name="[dbo].[items]", description=None,
         )
 
@@ -50,7 +50,7 @@ class mssql_wide(BaseModel[MssqlTypeParameters]):
 
     class Config(BaseModel.Config):
         metadata = MetaData(
-            schema_name="dbo", obj_name="wide", obj_type="Table",
+            db_name="app_db", schema_name="dbo", obj_name="wide", obj_type="Table",
             reference_name="[dbo].[wide]", description=None,
         )
 
@@ -61,7 +61,7 @@ class oracle_items(BaseModel[OracleTypeParameters]):
 
     class Config(BaseModel.Config):
         metadata = MetaData(
-            schema_name="APP", obj_name="ITEMS", obj_type="Table",
+            db_name="APPDB", schema_name="APP", obj_name="ITEMS", obj_type="Table",
             reference_name='"APP"."ITEMS"', description=None,
         )
 

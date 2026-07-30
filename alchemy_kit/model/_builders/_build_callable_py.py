@@ -12,6 +12,7 @@ from ..callable_model import CallableModel
 class CallablePyFileBuilder:
     template: ClassVar[Path] = Path(__file__).resolve().parent / "callable_py_template.txt"
 
+    db_name: str | None
     schema_name: str
     class_name: str
     file_path: Path
@@ -44,6 +45,7 @@ class CallablePyFileBuilder:
         ]
 
         metadata = [
+            f"db_name={self.db_name!r}",
             f"schema_name={self.schema_name!r}",
             f"name={self.procedure_model.name!r}",
             f"reference_name={render_reference(self.db_dialect, self.schema_name, self.procedure_model.name)!r}",
