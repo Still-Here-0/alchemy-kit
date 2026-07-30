@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from typing import Literal, Protocol, cast
+from typing import Any, Literal, Protocol, cast
 
 import pandas as pd
 import sqlalchemy
@@ -126,13 +126,19 @@ class EngineHandler:
         return row_count, data
 
     def _execute_with_binded_parameters(self, conn: sqlalchemy.Connection, query: sqlalchemy.TextClause, parameters: SqlParamMap) -> sqlalchemy.CursorResult:
-        binds = [
-            sqlalchemy.bindparam(key, value, expanding=isinstance(value, SQL_EXPAND_CLASSES))
-            for key, value in parameters.items()
-        ]
+        binds = [self._bind_parameter(key, value) for key, value in parameters.items()]
         binded_query = query.bindparams(*binds) if binds else query
 
         return conn.execute(binded_query)
+
+    @staticmethod
+    def _bind_parameter(key: str, value: SqlParamType) -> sqlalchemy.BindParameter[Any]:
+        """Bind one parameter, expanding a collection into an ``IN`` list; a
+        frozenset is copied into a tuple because SQLAlchemy indexes the value."""
+        if isinstance(value, SQL_EXPAND_CLASSES):
+            return sqlalchemy.bindparam(key, tuple(value), expanding=True)
+
+        return sqlalchemy.bindparam(key, value)
 
     def _execute_with_binded_records(self, conn: sqlalchemy.Connection, query: sqlalchemy.TextClause, records: Sequence[SqlParamMap]) -> sqlalchemy.CursorResult:
         """Execute the statement once per record.

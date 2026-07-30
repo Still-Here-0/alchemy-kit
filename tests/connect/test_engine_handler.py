@@ -132,17 +132,17 @@ def test_records_carrying_a_collection_bind_as_column_data(handler: EngineHandle
     assert counts[-1][1]["tags"].tolist() == ["['x', 'y']", "[]"]
 
 
-def test_a_mapping_statement_still_expands_a_list_into_an_in_clause(handler: EngineHandler):
+def test_a_mapping_statement_still_expands_a_collection_into_an_in_clause(handler: EngineHandler):
+    select = "SELECT label FROM tagged WHERE label IN :wanted ORDER BY label"
     counts = handler.run_sqls([
         SQL(raw_query="CREATE TEMPORARY TABLE tagged (label TEXT)"),
         SQL(
             raw_query="INSERT INTO tagged (label) VALUES (:label)",
             query_parameters=[{"label": "a"}, {"label": "b"}, {"label": "c"}],
         ),
-        SQL(
-            raw_query="SELECT label FROM tagged WHERE label IN :wanted ORDER BY label",
-            query_parameters={"wanted": ["a", "c"]},
-        ),
+        SQL(raw_query=select, query_parameters={"wanted": ("a", "c")}),
+        SQL(raw_query=select, query_parameters={"wanted": frozenset({"a", "b"})}),
     ])
 
-    assert counts[-1][1]["label"].tolist() == ["a", "c"]
+    assert counts[-2][1]["label"].tolist() == ["a", "c"]
+    assert counts[-1][1]["label"].tolist() == ["a", "b"]

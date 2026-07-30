@@ -71,7 +71,7 @@ class EngineManager(AbstractContextManager):
 
         self._engine_pool.clear()
 
-    def create_engine(self, con_info: ConnectionInfo) -> EngineHandler:
+    def create_handler(self, con_info: ConnectionInfo) -> EngineHandler:
         """Create and pool a new engine for a connection, returning a handler.
 
         Builds a SQLAlchemy engine from ``con_info.con_url``, stores it in the
@@ -86,7 +86,7 @@ class EngineManager(AbstractContextManager):
         Raises:
             ValueError: If an engine with the same ``unique_id`` already exists.
         """
-        if self.engine_exists(con_info.unique_id):
+        if self.handler_exists(con_info.unique_id):
             raise ValueError(f"Engine with unique id '{con_info.unique_id}' aready exists")
 
         engine = sqlalchemy.create_engine(con_info.con_url, **con_info.engine_kwargs())
@@ -114,7 +114,7 @@ class EngineManager(AbstractContextManager):
         info.handlers.append(new_handler)
         return new_handler
 
-    def engine_exists(self, key: str) -> bool:
+    def handler_exists(self, key: str) -> bool:
         """Return whether an engine is pooled under the given ``unique_id``.
 
         Args:

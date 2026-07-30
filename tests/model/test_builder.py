@@ -247,7 +247,7 @@ def test_mssql_local_build():
     from secret_local_mssql.uploader import SHEET
     from alchemy_kit.connect import EngineManager
     with EngineManager(None) as manager:
-        handler = manager.create_engine(conn)
+        handler = manager.create_handler(conn)
         sheet = handler.get_unit(SHEET)
         select = builder.SelectBuilder(from_=sheet).limit(100)
         _, df = select.run()

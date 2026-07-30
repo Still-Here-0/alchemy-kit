@@ -38,7 +38,7 @@ def clear_dir(dir: Path):
 
 def parse_db(conn_info: ConnectionInfo, schema_conf: SchemaConfig, logger: BetterLogger) -> DBModel:
     with EngineManager(None) as manager:
-        handler = manager.create_engine(conn_info)
+        handler = manager.create_handler(conn_info)
         extractor = MetadataExtractor(handler)
         db = DBModel(extractor.current_database(), conn_info.dialect)
 

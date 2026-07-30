@@ -16,7 +16,8 @@ DIR = Path(__file__).resolve().parent.parent
 
 def test_init_info():
     a = from_json(DIR / "test_json.json")
-    assert all([isinstance(con.unique_id, str) for con in a])
+    assert a
+    assert all([unique_id == con.unique_id for unique_id, con in a.items()])
 
     b = from_env(DIR / "dotenv_test")
     assert isinstance(b.unique_id, str)
@@ -46,7 +47,7 @@ def test_manager():
     info = ConnectionInfo(url, "a")
 
     with EngineManager(None) as manager:
-        handler = manager.create_engine(info)
+        handler = manager.create_handler(info)
         assert handler._con_info.unique_id == "a"
 
 

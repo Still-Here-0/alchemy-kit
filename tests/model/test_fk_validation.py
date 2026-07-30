@@ -45,7 +45,7 @@ def handler(tmp_path: Path) -> Iterator[EngineHandler]:
 
     info = ConnectionInfo(sqlalchemy.URL.create("sqlite", database=str(db_path)), "fk-test")
     with EngineManager(None) as manager:
-        yield manager.create_engine(info)
+        yield manager.create_handler(info)
 
 
 def test_iter_foreign_keys():

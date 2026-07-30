@@ -27,8 +27,8 @@ __all__ = [
     "from_values_oracle",
 ]
 
-def from_json(json_path: GenericPath) -> list[ConnectionInfo]:
-    """Build a list of connections from a JSON file.
+def from_json(json_path: GenericPath) -> dict[str, ConnectionInfo]:
+    """Build the connections described by a JSON file.
 
     The JSON is a mapping of ``unique_id`` -> connection definition, where each
     definition holds the keys named in ``Settings.FileExtraction`` (dialect,
@@ -39,7 +39,7 @@ def from_json(json_path: GenericPath) -> list[ConnectionInfo]:
         json_path: Path to the JSON file describing the connections.
 
     Returns:
-        One ``ConnectionInfo`` per entry, in file order.
+        One ``ConnectionInfo`` per entry, keyed by its ``unique_id``.
 
     Raises:
         ValueError: If ``json_path`` does not point to an existing file.
@@ -57,7 +57,7 @@ def from_json(json_path: GenericPath) -> list[ConnectionInfo]:
             dialect = DialectTypes(conn_data[Settings.FileExtraction.dialect_marker])
             connections[unique_id] = _match_dialect(dialect, unique_id, conn_data)
             
-    return list(connections.values())
+    return connections
 
 def from_env(env_path: GenericPath) -> ConnectionInfo:
     """Build a single connection from a ``.env`` file.

@@ -137,7 +137,7 @@ class BaseModel[_TypeParameters: str](DataFrameModel, metaclass=_BaseModelMeta):
             if column_name not in check_obj.columns:
                 continue
 
-            keys = check_obj[column_name].dropna().unique().tolist()
+            keys = tuple(check_obj[column_name].dropna().unique().tolist())
             if not keys:
                 continue
 

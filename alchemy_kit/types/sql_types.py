@@ -1,7 +1,10 @@
+from array import array
+from collections import deque
+from collections.abc import ItemsView, KeysView, Sequence, Set, ValuesView
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from enum import IntEnum, StrEnum
-from typing import Literal, TypeAlias, get_args, get_origin
+from typing import Final, Literal, TypeAlias
 from uuid import UUID
 
 SqlScalarType: TypeAlias = (
@@ -30,10 +33,11 @@ SqlScalarType: TypeAlias = (
     | IntEnum
 )
 
-SqlExpandType: TypeAlias = list[SqlScalarType] | set[SqlScalarType] | tuple[SqlScalarType, ...]
+SqlExpandType: TypeAlias = Sequence[SqlScalarType] | Set[SqlScalarType]
 
-SQL_EXPAND_CLASSES: tuple[type, ...] = tuple(
-    get_origin(t) or t for t in get_args(SqlExpandType)
+SQL_EXPAND_CLASSES: Final = (
+    list, tuple, range, deque, array,
+    set, frozenset, KeysView, ValuesView, ItemsView,
 )
 
 SqlParamType: TypeAlias = SqlScalarType | SqlExpandType
