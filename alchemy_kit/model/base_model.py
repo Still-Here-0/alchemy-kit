@@ -24,7 +24,7 @@ class _BaseModelMeta(MetaModel):
     def __init__(self, name, bases, namespace) -> None:
         super().__init__(name, bases, namespace)
 
-class BaseModel[_TypeParameters: str](DataFrameModel, metaclass=_BaseModelMeta):
+class BaseModel(DataFrameModel, metaclass=_BaseModelMeta):
     """Base pandera model that validates a DataFrame against a SQL object's schema."""
 
     @classmethod
@@ -62,7 +62,7 @@ class BaseModel[_TypeParameters: str](DataFrameModel, metaclass=_BaseModelMeta):
         lazy: bool = False,
         inplace: bool = False,
         drop_invalid_rows: bool = False,
-        handler: "EngineHandler | None" = None,
+        handler: "EngineHandler[Any] | None" = None,
     ) -> DataFrame[Self]:
         """Validate a DataFrame against this model, stripping timezones first.
 
@@ -124,7 +124,7 @@ class BaseModel[_TypeParameters: str](DataFrameModel, metaclass=_BaseModelMeta):
                 yield str(name), metadata.foreign_key
 
     @classmethod
-    def validate_foreign_keys(cls, check_obj: pd.DataFrame, handler: "EngineHandler") -> dict[str, set[Any]]:
+    def validate_foreign_keys(cls, check_obj: pd.DataFrame, handler: "EngineHandler[Any]") -> dict[str, set[Any]]:
         """Check that every FK column's values exist in the referenced table.
 
         Queries each referenced table once (deduplicated ``IN`` list) through
@@ -161,7 +161,9 @@ class BaseModel[_TypeParameters: str](DataFrameModel, metaclass=_BaseModelMeta):
         return failures
     
     @classmethod
-    def _get_unit(cls, handler: "EngineHandler") -> "ObjectUnit[_TypeParameters]":
+    def _get_unit[_TypeParameters: str](
+        cls, handler: "EngineHandler[_TypeParameters]"
+    ) -> "ObjectUnit[_TypeParameters]":
         """Return an :class:`ObjectUnit` for this model bound to ``handler``'s
         connection; called by :meth:`EngineHandler.get_unit`."""
         from .units._object_unit import ObjectUnit

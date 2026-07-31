@@ -107,6 +107,39 @@ mismatches are flagged by your editor. The builder also covers `join`,
 (`sum`, `avg`, `count`, ...) and window functions (`row_number`, `rank`,
 `lag`/`lead`, `over`).
 
+Tell the connection which dialect to expect and its SQL type names ride along
+too, so `cast` is checked against that database's own types:
+
+```python
+from alchemy_kit.connect import info_builder
+from alchemy_kit.dialects import MssqlMap
+
+conn = info_builder.from_env(".env", expect=MssqlMap)  # raises if the URL is not MSSQL
+
+with EngineManager(None) as manager:
+    handler = manager.create_handler(conn)      # carries MSSQL's type names
+    table = handler.get_unit(items)
+
+    table.price.cast("decimal")                 # checked; "clob" would not compile
+```
+
+`alchemy_kit.dialects` holds one map per database — `MssqlMap`,
+`PostgresqlMap`, `MysqlMap`, `MariadbMap`, `OracleMap`, `SqliteMap`. Passing
+one is optional: leave it out and everything still runs, you just lose the
+`cast` checking. The same argument works on `ConnectionInfo`, `from_json` and
+`EngineManager.get_handler`.
+
+`from_json` builds one named connection at a time, so a file describing several
+databases gives each of them its own map — and only the entry you name is
+built:
+
+```python
+prod  = info_builder.from_json("connections.json", "prod",  expect=MssqlMap)
+cache = info_builder.from_json("connections.json", "cache", expect=SqliteMap)
+```
+
+The name may be left out only when the file holds exactly one connection.
+
 ### 3. Write data
 
 ```python

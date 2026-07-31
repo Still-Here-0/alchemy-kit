@@ -10,11 +10,11 @@ from ..types.sql_types import SQL_EXPAND_CLASSES, SqlParamType
 from ._info import ConnectionInfo
 
 
-class _UnitFactory[_UnitT](Protocol):
-    def _get_unit(self, handler: "EngineHandler") -> _UnitT: ...
+class _UnitFactory[_TypeParameters: str, _UnitT](Protocol):
+    def _get_unit(self, handler: "EngineHandler[_TypeParameters]") -> _UnitT: ...
 
 
-class EngineHandler:
+class EngineHandler[_TypeParameters: str]:
     """Performs database operations against a single pooled engine.
 
     Binds a SQLAlchemy engine to its ``ConnectionInfo`` and serves as the entry
@@ -26,11 +26,11 @@ class EngineHandler:
     handler can no longer be used.
     """
 
-    def __init__(self, engine: sqlalchemy.Engine, con_info: ConnectionInfo) -> None:
+    def __init__(self, engine: sqlalchemy.Engine, con_info: ConnectionInfo[_TypeParameters]) -> None:
         self._engine = engine
         self._con_info = con_info
 
-    def get_unit[_UnitT](self, model: _UnitFactory[_UnitT]) -> _UnitT:
+    def get_unit[_UnitT](self, model: _UnitFactory[_TypeParameters, _UnitT]) -> _UnitT:
         """Return a unit for ``model``, bound to this handler's connection and
         compiled with its dialect."""
         return model._get_unit(self)

@@ -12,16 +12,15 @@ from {base_model_module} import BaseModel
 from {engine_handler_module} import EngineHandler
 from {object_unit_module} import ObjectUnit
 from {column_unit_module} import ColumnUnit
-from {type_parameters_module} import {type_parameters}
 from datetime import datetime, date
 from pandera.typing import Series
 from typing import Any
 
-class {class_name}(BaseModel[{type_parameters}]):
+class {class_name}(BaseModel):
     :columns
 
     @classmethod
-    def _get_unit(cls, handler: EngineHandler) -> {class_name}_Unit: ...
+    def _get_unit[T: str](cls, handler: EngineHandler[T]) -> {class_name}_Unit[T]: ...
 
-class {class_name}_Unit(ObjectUnit[{type_parameters}]):
+class {class_name}_Unit[T: str](ObjectUnit[T]):
     :unit_columns

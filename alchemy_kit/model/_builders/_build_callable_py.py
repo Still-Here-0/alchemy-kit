@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import ClassVar
 
-from ...resources.dialect_map import get_codegen_imports, render_reference
-from ...types import DialectTypes, sql_type_parameters
+from ...resources.dialect_map import render_reference
+from ...types import DialectTypes
 from .._model.procedure_model import ProcedureModel
 from ..callable_model import CallableModel
 
@@ -20,13 +20,9 @@ class CallablePyFileBuilder:
     db_dialect: DialectTypes
 
     def build(self) -> str:
-        _, _, type_parameters = get_codegen_imports(self.db_dialect)
-
         file_data = self.template.read_text("UTF-8").format(
             class_name=self.class_name,
             callable_model_module=CallableModel.__module__,
-            type_parameters_module=sql_type_parameters.__name__,
-            type_parameters=type_parameters,
             metadata=self._get_metadata(),
         )
 

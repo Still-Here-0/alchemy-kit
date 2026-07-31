@@ -14,7 +14,7 @@ class ObjectUnit[_TypeParameters: str]:
     """A selectable database object (table/view) from a generated model,
     wrapping the SQLAlchemy Core ``Table`` built from the model's metadata
     with the handler's connection dialect. Generic over the dialect's SQL
-    type names (``_TypeParameters``, inferred from ``base``).
+    type names (``_TypeParameters``, inferred from ``handler``).
 
     Attribute access yields :class:`ColumnUnit` instances wrapping the
     underlying Core columns; the model's Python field names resolve to their
@@ -23,8 +23,8 @@ class ObjectUnit[_TypeParameters: str]:
 
     def __init__(
         self,
-        base: type[BaseModel[_TypeParameters]],
-        handler: "EngineHandler",
+        base: type[BaseModel],
+        handler: "EngineHandler[_TypeParameters]",
         selectable: FromClause | None = None,
     ) -> None:
         self._base = base

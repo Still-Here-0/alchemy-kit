@@ -30,10 +30,10 @@ class TempBuilder[F](SqlBuilder):
     def from_dataframe(
         cls: type[TempBuilder[Unset]],
         df: pd.DataFrame,
-        handler: EngineHandler,
+        handler: EngineHandler[Any],
         name: str,
         *,
-        base: type[BaseModel[Any]] | None = ...,
+        base: type[BaseModel] | None = ...,
         global_temp: bool = ...,
     ) -> TempBuilder[Set]: ...
     def _statement(self) -> CreateTable: ...

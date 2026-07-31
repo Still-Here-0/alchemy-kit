@@ -7,10 +7,10 @@ from pandera.typing import Series
 from alchemy_kit.connect._engine_handler import EngineHandler
 from alchemy_kit.connect._info import ConnectionInfo
 from alchemy_kit.model.base_model import BaseModel, MetaData
-from alchemy_kit.types.sql_type_parameters import MssqlTypeParameters, OracleTypeParameters, SqliteTypeParameters
+from alchemy_kit.dialects import MssqlMap, OracleMap, SqliteMap
 
 
-class items(BaseModel[SqliteTypeParameters]):
+class items(BaseModel):
     id_1: Series[int] = pa.Field(nullable=False, alias="id", metadata={"original_type": "integer"})
     name: Series[str] = pa.Field(nullable=False, alias="name", metadata={"original_type": "varchar"})
     price: Optional[Series[float]] = pa.Field(nullable=True, alias="price", metadata={"original_type": "real"})
@@ -22,7 +22,7 @@ class items(BaseModel[SqliteTypeParameters]):
         )
 
 
-class parts(BaseModel[SqliteTypeParameters]):
+class parts(BaseModel):
     id_1: Series[int] = pa.Field(nullable=False, alias="id", metadata={"original_type": "integer"})
     label: Series[str] = pa.Field(nullable=False, alias="label", metadata={"original_type": "varchar"})
 
@@ -33,7 +33,7 @@ class parts(BaseModel[SqliteTypeParameters]):
         )
 
 
-class mssql_items(BaseModel[MssqlTypeParameters]):
+class mssql_items(BaseModel):
     id_1: Series[int] = pa.Field(nullable=False, alias="id", metadata={"original_type": "int"})
 
     class Config(BaseModel.Config):
@@ -43,7 +43,7 @@ class mssql_items(BaseModel[MssqlTypeParameters]):
         )
 
 
-class mssql_wide(BaseModel[MssqlTypeParameters]):
+class mssql_wide(BaseModel):
     id_1: Series[int] = pa.Field(nullable=False, alias="id", metadata={"original_type": "int"})
     name: Series[str] = pa.Field(nullable=False, alias="name", metadata={"original_type": "varchar"})
     price: Optional[Series[float]] = pa.Field(nullable=True, alias="price", metadata={"original_type": "float"})
@@ -55,7 +55,7 @@ class mssql_wide(BaseModel[MssqlTypeParameters]):
         )
 
 
-class oracle_items(BaseModel[OracleTypeParameters]):
+class oracle_items(BaseModel):
     id_1: Series[int] = pa.Field(nullable=False, alias="ID", metadata={"original_type": "number"})
     name: Series[str] = pa.Field(nullable=False, alias="NAME", metadata={"original_type": "varchar2"})
 
@@ -66,6 +66,6 @@ class oracle_items(BaseModel[OracleTypeParameters]):
         )
 
 
-SQLITE_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("sqlite://")))
-MSSQL_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("mssql+pyodbc://")))
-ORACLE_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("oracle+oracledb://")))
+SQLITE_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("sqlite://"), expect=SqliteMap))
+MSSQL_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("mssql+pyodbc://"), expect=MssqlMap))
+ORACLE_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("oracle+oracledb://"), expect=OracleMap))

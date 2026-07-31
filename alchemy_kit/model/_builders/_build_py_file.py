@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from ...resources._identifiers import Identifiers
-from ...resources.dialect_map import get_codegen_imports, get_str_length, get_type, render_reference
-from ...types import DialectTypes, sql_type_parameters
+from ...resources.dialect_map import get_str_length, get_type, render_reference
+from ...types import DialectTypes
 from ...types.model_metadata import ForeignKeyMeta
 from .._model.column_model import ColumnModel
 from .._model.constraint_model import CheckConstraintModel, FilteredUniqueIndexModel
@@ -35,7 +35,6 @@ class PyFileBuilder:
         }
 
     def build(self) -> str:
-        _, _, type_parameters = get_codegen_imports(self.db_dialect)
         check_methods, unparsed_table_checks = self._build_table_checks()
         index_methods, unparsed_indexes = self._build_index_checks()
         check_methods += index_methods
@@ -44,8 +43,6 @@ class PyFileBuilder:
         template = template.format(
             class_name=self.class_name,
             base_model_module=BaseModel.__module__,
-            type_parameters_module=sql_type_parameters.__name__,
-            type_parameters=type_parameters,
             unique=f"unique={self.object_model.get_unique_constrait()!r}",
             metadata=self._get_object_metadata(unparsed_table_checks, unparsed_indexes),
         )

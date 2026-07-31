@@ -41,10 +41,9 @@ def _compile_call_sqlite(element: _Call, compiler: Any, **kw: Any) -> str:
     raise ValueError("SQLite does not support stored procedure calls")
 
 
-class CallableUnit[_TypeParameters: str]:
+class CallableUnit:
     """A stored procedure from a generated model, bound to a connection
-    through ``handler``. Generic over the dialect's SQL type names
-    (``_TypeParameters``, inferred from ``base``).
+    through ``handler``.
 
     :meth:`run` executes the procedure with the given arguments; :meth:`to_sql`
     and :meth:`render` produce the dialect-correct ``CALL``/``EXEC`` statement
@@ -52,8 +51,8 @@ class CallableUnit[_TypeParameters: str]:
 
     def __init__(
         self,
-        base: type[CallableModel[_TypeParameters]],
-        handler: "EngineHandler",
+        base: type[CallableModel],
+        handler: "EngineHandler[Any]",
     ) -> None:
         self._base = base
         self._handler = handler

@@ -9,14 +9,13 @@
 # --------------------------------------------------------------------------------
 
 from {base_model_module} import BaseModel, MetaData
-from {type_parameters_module} import {type_parameters}
 from datetime import datetime, date
 from pandera.typing import Series
 from typing import Optional, Any
 import pandas as pd
 import pandera.pandas as pa
 
-class {class_name}(BaseModel[{type_parameters}]):
+class {class_name}(BaseModel):
     :columns
 
     :checks

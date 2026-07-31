@@ -22,7 +22,7 @@ class SqlBuilder(ABC):
     handler the units came from. Subclasses implement ``_statement``;
     builders are immutable."""
 
-    def __init__(self, base: type[BaseModel[Any]], handler: EngineHandler) -> None:
+    def __init__(self, base: type[BaseModel], handler: EngineHandler[Any]) -> None:
         self._base = base
         self._handler = handler
 

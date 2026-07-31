@@ -1,0 +1,20 @@
+{
+  "first": {
+    "dialect": "mssql",
+    "auth":"Microsoft-Auth",
+    "driver":"SQL Server",
+    "server":"first_server",
+    "database":"first_database"
+  },
+  "second": {
+    "dialect": "mssql",
+    "auth":"Microsoft-Auth",
+    "driver":"SQL Server",
+    "server":"second_server",
+    "database":"second_database"
+  },
+  "unbuildable": {
+    "dialect": "sqlite",
+    "auth":"Microsoft-Auth"
+  }
+}

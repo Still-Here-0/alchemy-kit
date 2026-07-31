@@ -1,17 +1,19 @@
 import json
 from pathlib import Path
-from typing import Literal, Optional, cast, overload
+from typing import Any, Literal, Optional, cast, overload
 
 import sqlalchemy
 from dotenv import dotenv_values
 from pydantic import SecretStr
 
+from ..resources.dialect_map import DialectMap, MssqlMap
 from ..resources._settings import Settings
 from ..types import _driver_types
 from ..types.api_types import SqlServerApi
 from ..types.auth_types import AuthType
 from ..types.dialect_types import DialectTypes
 from ..types.generic_path import GenericPath
+from ..types.sql_type_parameters import MssqlTypeParameters
 from ._conn_builders import mssql
 from ._drivers import require_driver
 from ._info import ConnectionInfo
@@ -27,39 +29,84 @@ __all__ = [
     "from_values_oracle",
 ]
 
-def from_json(json_path: GenericPath) -> dict[str, ConnectionInfo]:
-    """Build the connections described by a JSON file.
+def from_json[_TypeParameters: str](
+    json_path: GenericPath,
+    unique_id: str | None = None,
+    *,
+    expect: type[DialectMap[_TypeParameters]] | None = None,
+) -> ConnectionInfo[_TypeParameters]:
+    """Build one of the connections described by a JSON file.
 
     The JSON is a mapping of ``unique_id`` -> connection definition, where each
     definition holds the keys named in ``Settings.FileExtraction`` (dialect,
-    auth, driver, server, ...). Each entry is dispatched by dialect and turned
-    into a ``ConnectionInfo``.
+    auth, driver, server, ...). Only the entry named by ``unique_id`` is built,
+    so a broken sibling entry does not stop it; its key becomes the
+    connection's ``unique_id``.
+
+    Naming one entry is what lets each connection in a multi-dialect file be
+    read with its own ``expect``.
 
     Args:
         json_path: Path to the JSON file describing the connections.
+        unique_id: Which entry to build; may be omitted only when the file
+            holds exactly one.
+        expect: The dialect map the connection must be of; ``None`` skips the
+            check and leaves its SQL type names unpinned.
 
     Returns:
-        One ``ConnectionInfo`` per entry, keyed by its ``unique_id``.
+        The ``ConnectionInfo`` for the chosen entry.
 
     Raises:
-        ValueError: If ``json_path`` does not point to an existing file.
+        ValueError: If ``json_path`` does not point to an existing file, the
+            entry cannot be resolved, or it is not of ``expect``'s dialect.
     """
     json_path = Path(json_path).resolve()
     if not json_path.is_file():
         raise ValueError(f"JSON file not found: '{json_path}'")
 
-    connections = {}
-    
     with json_path.open('r', encoding="UTF-8") as file:
         data: dict[str, dict[str, str]] = json.load(file)
 
-        for unique_id, conn_data in data.items():
-            dialect = DialectTypes(conn_data[Settings.FileExtraction.dialect_marker])
-            connections[unique_id] = _match_dialect(dialect, unique_id, conn_data)
-            
-    return connections
+    unique_id = _resolve_unique_id(json_path, data, unique_id)
+    conn_data = data[unique_id]
 
-def from_env(env_path: GenericPath) -> ConnectionInfo:
+    dialect = DialectTypes(conn_data[Settings.FileExtraction.dialect_marker])
+    connection = _match_dialect(dialect, unique_id, conn_data)
+    connection.expect_dialect(expect)
+
+    return cast("ConnectionInfo[_TypeParameters]", connection)
+
+def _resolve_unique_id(json_path: Path, data: dict[str, dict[str, str]], unique_id: str | None) -> str:
+    """Resolve which entry of a connection file to build: the one named, or the
+    file's only one when no name is given.
+
+    Raises:
+        ValueError: If the file is empty, holds several entries and none was
+            named, or does not hold ``unique_id``.
+    """
+    if not data:
+        raise ValueError(f"'{json_path}' holds no connections")
+
+    available = ", ".join(repr(key) for key in data)
+
+    if unique_id is None:
+        if len(data) > 1:
+            raise ValueError(
+                f"'{json_path}' holds {len(data)} connections, pass one of: {available}"
+            )
+
+        return next(iter(data))
+
+    if unique_id not in data:
+        raise ValueError(f"'{unique_id}' is not in '{json_path}', which holds: {available}")
+
+    return unique_id
+
+def from_env[_TypeParameters: str](
+    env_path: GenericPath,
+    *,
+    expect: type[DialectMap[_TypeParameters]] | None = None,
+) -> ConnectionInfo[_TypeParameters]:
     """Build a single connection from a ``.env`` file.
 
     The file is read as a flat set of key/value pairs using the keys named in
@@ -68,12 +115,15 @@ def from_env(env_path: GenericPath) -> ConnectionInfo:
 
     Args:
         env_path: Path to the ``.env`` file describing the connection.
+        expect: The dialect map the connection must be of; ``None`` skips the
+            check and leaves its SQL type names unpinned.
 
     Returns:
         The ``ConnectionInfo`` for the connection described in the file.
 
     Raises:
-        ValueError: If ``env_path`` does not point to an existing file.
+        ValueError: If ``env_path`` does not point to an existing file, or the
+            connection is not of ``expect``'s dialect.
     """
     env_path = Path(env_path).resolve()
     if not env_path.is_file():
@@ -82,7 +132,10 @@ def from_env(env_path: GenericPath) -> ConnectionInfo:
     env_data = cast(dict[str, str], dotenv_values(env_path))
     dialect = DialectTypes(env_data[Settings.FileExtraction.dialect_marker])
 
-    return _match_dialect(dialect, env_data.get(Settings.FileExtraction.unique_id_marker), env_data)
+    connection = _match_dialect(dialect, env_data.get(Settings.FileExtraction.unique_id_marker), env_data)
+    connection.expect_dialect(expect)
+
+    return cast("ConnectionInfo[_TypeParameters]", connection)
 
 _TRUE_VALUES = {"yes", "true", "1", "on"}
 _FALSE_VALUES = {"no", "false", "0", "off"}
@@ -98,7 +151,7 @@ def _parse_optional_bool(value: Optional[str]) -> Optional[bool]:
         return False
     raise ValueError(f"Expected a boolean-like value, got {value!r}")
 
-def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: dict[str, str]) -> ConnectionInfo: # CONTINUE
+def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: dict[str, str]) -> ConnectionInfo[Any]: # CONTINUE
     """Dispatch a parsed connection definition to the right dialect builder.
 
     Reads the auth method (and, per dialect, the remaining keys named in
@@ -181,7 +234,7 @@ def from_values_mssql(
     api: SqlServerApi = SqlServerApi.PYODBC,
     encrypt: Optional[bool] = None,
     trust_server_certificate: Optional[bool] = None,
-) -> ConnectionInfo: ...
+) -> ConnectionInfo[MssqlTypeParameters]: ...
 @overload
 def from_values_mssql(
     auth_type: Literal[AuthType.SQL_AUTH],
@@ -195,21 +248,21 @@ def from_values_mssql(
     api: SqlServerApi = SqlServerApi.PYODBC,
     encrypt: Optional[bool] = None,
     trust_server_certificate: Optional[bool] = None,
-) -> ConnectionInfo: ...
+) -> ConnectionInfo[MssqlTypeParameters]: ...
 
 def from_values_mssql(
-    auth_type: AuthType,
-    driver: _driver_types.SqlServerDrivers,
-    server: str,
-    database: str,
-    *,
-    user_name: Optional[str] = None,
-    user_pwd: Optional[SecretStr] = None,
-    unique_id: Optional[str] = None,
-    api: SqlServerApi = SqlServerApi.PYODBC,
-    encrypt: Optional[bool] = None,
-    trust_server_certificate: Optional[bool] = None,
-) -> ConnectionInfo:
+        auth_type: AuthType,
+        driver: _driver_types.SqlServerDrivers,
+        server: str,
+        database: str,
+        *,
+        user_name: Optional[str] = None,
+        user_pwd: Optional[SecretStr] = None,
+        unique_id: Optional[str] = None,
+        api: SqlServerApi = SqlServerApi.PYODBC,
+        encrypt: Optional[bool] = None,
+        trust_server_certificate: Optional[bool] = None,
+    ) -> ConnectionInfo[MssqlTypeParameters]:
     """Build a SQL Server connection from individual values.
 
     Constructs the SQLAlchemy URL for the chosen auth method and API/driver.
@@ -253,9 +306,9 @@ def from_values_mssql(
                 encrypt, trust_server_certificate,
             )
 
-    return ConnectionInfo(conn_url, unique_id)
+    return ConnectionInfo(conn_url, unique_id, expect=MssqlMap)
 
-def from_values_mysql() -> ConnectionInfo:
+def from_values_mysql() -> ConnectionInfo[Any]:
     """Build a MySQL connection from individual values.
 
     Not yet implemented.
@@ -265,7 +318,7 @@ def from_values_mysql() -> ConnectionInfo:
     """
     raise NotImplementedError("Function not implemented")
 
-def from_values_postgresql() -> ConnectionInfo:
+def from_values_postgresql() -> ConnectionInfo[Any]:
     """Build a PostgreSQL connection from individual values.
 
     Not yet implemented.
@@ -275,7 +328,7 @@ def from_values_postgresql() -> ConnectionInfo:
     """
     raise NotImplementedError("Function not implemented")
 
-def from_values_mariadb() -> ConnectionInfo:
+def from_values_mariadb() -> ConnectionInfo[Any]:
     """Build a MariaDB connection from individual values.
 
     Not yet implemented.
@@ -285,7 +338,7 @@ def from_values_mariadb() -> ConnectionInfo:
     """
     raise NotImplementedError("Function not implemented")
 
-def from_values_sqlite() -> ConnectionInfo:
+def from_values_sqlite() -> ConnectionInfo[Any]:
     """Build a SQLite connection from individual values.
 
     Not yet implemented.
@@ -295,7 +348,7 @@ def from_values_sqlite() -> ConnectionInfo:
     """
     raise NotImplementedError("Function not implemented")
 
-def from_values_oracle() -> ConnectionInfo:
+def from_values_oracle() -> ConnectionInfo[Any]:
     """Build an Oracle connection from individual values.
 
     Not yet implemented.

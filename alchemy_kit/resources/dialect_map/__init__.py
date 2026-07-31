@@ -22,8 +22,13 @@ from .sqlite import SqliteMap
 __all__ = [
     "ColumnLike",
     "DialectMap",
+    "MariadbMap",
+    "MssqlMap",
+    "MysqlMap",
+    "OracleMap",
+    "PostgresqlMap",
     "ReflectedTypeFacts",
-    "get_codegen_imports",
+    "SqliteMap",
     "get_map",
     "get_sa_dialect",
     "get_str_length",
@@ -34,18 +39,16 @@ __all__ = [
 
 class _DialectEntry(NamedTuple):
     parameter_map: type[DialectMap]
-    # Type objects (Literal, Union, ...) does not carry the variable name
-    type_parameters: str
     sa_dialect: Callable[..., Dialect]
 
 
 _REGISTRY: dict[DialectTypes, _DialectEntry] = {
-    DialectTypes.MSSQL: _DialectEntry(MssqlMap, "MssqlTypeParameters", sa_mssql.dialect),
-    DialectTypes.MYSQL: _DialectEntry(MysqlMap, "MysqlTypeParameters", sa_mysql.dialect),
-    DialectTypes.MARIADB: _DialectEntry(MariadbMap, "MariadbTypeParameters", sa_mariadb.MariaDBDialect),
-    DialectTypes.POSTGRESQL: _DialectEntry(PostgresqlMap, "PostgresqlTypeParameters", sa_postgresql.dialect),
-    DialectTypes.ORACLE: _DialectEntry(OracleMap, "OracleTypeParameters", sa_oracle.dialect),
-    DialectTypes.SQLITE: _DialectEntry(SqliteMap, "SqliteTypeParameters", sa_sqlite.dialect),
+    DialectTypes.MSSQL: _DialectEntry(MssqlMap, sa_mssql.dialect),
+    DialectTypes.MYSQL: _DialectEntry(MysqlMap, sa_mysql.dialect),
+    DialectTypes.MARIADB: _DialectEntry(MariadbMap, sa_mariadb.MariaDBDialect),
+    DialectTypes.POSTGRESQL: _DialectEntry(PostgresqlMap, sa_postgresql.dialect),
+    DialectTypes.ORACLE: _DialectEntry(OracleMap, sa_oracle.dialect),
+    DialectTypes.SQLITE: _DialectEntry(SqliteMap, sa_sqlite.dialect),
 }
 
 
@@ -69,13 +72,6 @@ def get_sa_dialect(dialect: DialectTypes) -> Dialect:
         return _REGISTRY[dialect].sa_dialect(paramstyle="named")
     except KeyError:
         raise ValueError(f"Dialect not mapped on dialect_map: {dialect}") from None
-
-
-def get_codegen_imports(dialect: DialectTypes) -> tuple[str, str, str]:
-    """Return the ``(map_module, map_class, type_parameters)`` identifiers a
-    generated model needs to reference ``dialect``."""
-    parameter_map = get_map(dialect)
-    return parameter_map.__module__, parameter_map.__name__, _REGISTRY[dialect].type_parameters
 
 
 def get_type(dialect: DialectTypes, sql_type: str) -> PyTypeParameters:

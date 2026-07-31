@@ -7,7 +7,7 @@ from ..types.dialect_types import DialectTypes
 from ._builders._column_metadata import ColumnMetadata
 from .base_model import BaseModel
 
-_TABLES: dict[tuple[type[BaseModel[Any]], DialectTypes], sa.Table] = {}
+_TABLES: dict[tuple[type[BaseModel], DialectTypes], sa.Table] = {}
 
 
 def _column_from_model(name: str, column: Any, dialect_map: type[DialectMap[Any]]) -> sa.Column[Any]:
@@ -24,7 +24,7 @@ def _column_from_model(name: str, column: Any, dialect_map: type[DialectMap[Any]
     )
 
 
-def table_from_model(base: type[BaseModel[Any]], dialect: DialectTypes) -> sa.Table:
+def table_from_model(base: type[BaseModel], dialect: DialectTypes) -> sa.Table:
     """Return the SQLAlchemy Core ``Table`` for a generated model, built in
     memory from the model's metadata (no reflection) and cached per
     ``(model, dialect)``.

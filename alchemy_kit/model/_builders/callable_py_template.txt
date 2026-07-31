@@ -9,9 +9,8 @@
 # --------------------------------------------------------------------------------
 
 from {callable_model_module} import CallableModel, CallMetaData
-from {type_parameters_module} import {type_parameters}
 
-class {class_name}(CallableModel[{type_parameters}]):
+class {class_name}(CallableModel):
 
     class Config(CallableModel.Config):
         {metadata}

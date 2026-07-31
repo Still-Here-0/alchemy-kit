@@ -19,16 +19,17 @@ type _Sortable = ColumnUnit[Any] | OrderingColumnUnit[Any]
 
 class _ExpressionUnit[_TypeParameters: str]:
     """Immutable wrapper around a SQLAlchemy Core column expression, bound to
-    the connection's dialect through ``handler``. Every operation on a unit
-    returns a new unit."""
+    the connection's dialect through ``handler``, which is also where the
+    dialect's SQL type names (``_TypeParameters``) come from. Every operation on
+    a unit returns a new unit."""
 
     __hash__ = object.__hash__
 
     def __init__(
         self,
         element: ColumnElement[Any],
-        base: type[BaseModel[_TypeParameters]] | None = None,
-        handler: "EngineHandler | None" = None,
+        base: type[BaseModel] | None = None,
+        handler: "EngineHandler[_TypeParameters] | None" = None,
     ) -> None:
         self._element = element
         self._base    = base
@@ -50,8 +51,8 @@ class _WindowMixin[_TypeParameters: str]:
     clause."""
 
     _element: Function[Any]
-    _base: type[BaseModel[_TypeParameters]]
-    _handler: "EngineHandler | None"
+    _base: type[BaseModel]
+    _handler: "EngineHandler[_TypeParameters] | None"
 
     def over(
         self,
@@ -97,7 +98,7 @@ class _WindowMixin[_TypeParameters: str]:
 
 class ColumnUnit[_TypeParameters: str](_ExpressionUnit[_TypeParameters]):
     """A value column expression from a model, generic over the dialect's SQL
-    type names (``_TypeParameters``, inferred from ``base``).
+    type names (``_TypeParameters``, inferred from ``handler``).
 
     Arithmetic (``+``, ``-``, ``*``, ``/``, ``//``, ``%``) composes new
     :class:`ColumnUnit` instances, comparisons (``==``, ``!=``, ``<``, ``<=``,
@@ -506,8 +507,8 @@ class BooleanColumnUnit[_TypeParameters: str](_ExpressionUnit[_TypeParameters]):
 
 class WindowFunctionUnit[_TypeParameters: str](_ExpressionUnit[_TypeParameters], _WindowMixin[_TypeParameters]):
     """A window-only function (:meth:`ColumnUnit.lag`/``lead``,
-    :meth:`ObjectUnit.row_number` and other methods from :class:`ObjectUnit`), 
-    which is invalid SQL until :meth:`over` attaches its window; no other 
+    :meth:`OperandUnit.row_number` and other methods from :class:`OperandUnit`),
+    which is invalid SQL until :meth:`over` attaches its window; no other
     operation is available.
     """
 

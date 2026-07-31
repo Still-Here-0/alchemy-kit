@@ -1,18 +1,19 @@
 from contextlib import AbstractContextManager
 from logging import Logger
 from types import TracebackType
-from typing import Optional, Self, NamedTuple, TypeAlias
+from typing import Any, Optional, Self, NamedTuple, TypeAlias, cast
 
 import sqlalchemy
 
 from ..resources._better_logger import BetterLogger
+from ..resources.dialect_map import DialectMap
 from ._engine_handler import EngineHandler
 from ._info import ConnectionInfo
 
 class _EngineInfo(NamedTuple):
     engine: sqlalchemy.Engine
-    con_info: ConnectionInfo
-    handlers: list[EngineHandler]
+    con_info: ConnectionInfo[Any]
+    handlers: list[EngineHandler[Any]]
 
 _EnginePool: TypeAlias = dict[str, _EngineInfo]
 
@@ -71,7 +72,9 @@ class EngineManager(AbstractContextManager):
 
         self._engine_pool.clear()
 
-    def create_handler(self, con_info: ConnectionInfo) -> EngineHandler:
+    def create_handler[_TypeParameters: str](
+        self, con_info: ConnectionInfo[_TypeParameters]
+    ) -> EngineHandler[_TypeParameters]:
         """Create and pool a new engine for a connection, returning a handler.
 
         Builds a SQLAlchemy engine from ``con_info.con_url``, stores it in the
@@ -92,24 +95,34 @@ class EngineManager(AbstractContextManager):
         engine = sqlalchemy.create_engine(con_info.con_url, **con_info.engine_kwargs())
         self._engine_pool[con_info.unique_id] = _EngineInfo(engine, con_info, [])
 
-        return self.get_handler(con_info.unique_id)
+        return cast(
+            "EngineHandler[_TypeParameters]", self.get_handler(con_info.unique_id)
+        )
 
-    def get_handler(self, key: str) -> EngineHandler:
+    def get_handler[_TypeParameters: str](
+        self, key: str, expect: type[DialectMap[_TypeParameters]] | None = None
+    ) -> EngineHandler[_TypeParameters]:
         """Build an additional handler for an already-pooled engine.
 
         Each call returns a new handler sharing the pooled engine; the handler
-        is tracked so it can be detached when the manager exits.
+        is tracked so it can be detached when the manager exits. The pool is
+        keyed by string, so ``expect`` is how a caller re-states the dialect it
+        wants back.
 
         Args:
             key: The ``unique_id`` of an existing pooled engine.
+            expect: The dialect map the caller asked for; ``None`` skips the
+                check and leaves the handler's SQL type names unpinned.
 
         Returns:
             A new ``EngineHandler`` bound to the pooled engine.
 
         Raises:
             KeyError: If no engine exists for ``key``.
+            ValueError: If the pooled connection is not of ``expect``'s dialect.
         """
         info = self._engine_pool[key]
+        info.con_info.expect_dialect(expect)
         new_handler = EngineHandler(info.engine, info.con_info)
         info.handlers.append(new_handler)
         return new_handler

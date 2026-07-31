@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import ClassVar
 
 from ...connect._engine_handler import EngineHandler
-from ...resources.dialect_map import get_codegen_imports, get_type
-from ...types import DialectTypes, sql_type_parameters
+from ...resources.dialect_map import get_type
+from ...types import DialectTypes
 from .._model.column_model import ColumnModel
 from .._model.object_model import ObjectModel
 from ..base_model import BaseModel
@@ -23,16 +23,12 @@ class StubFileBuilder:
     column_names: dict[str, str]
 
     def build(self) -> str:
-        _, _, type_parameters = get_codegen_imports(self.db_dialect)
-
         template = self.template.read_text("UTF-8").format(
             class_name=self.class_name,
             base_model_module=BaseModel.__module__,
             engine_handler_module=EngineHandler.__module__,
             object_unit_module=units.__name__,
             column_unit_module=units.__name__,
-            type_parameters_module=sql_type_parameters.__name__,
-            type_parameters=type_parameters,
         )
 
         columns = [
@@ -45,7 +41,7 @@ class StubFileBuilder:
             for name, column_model in columns
         ]
         unit_columns = [
-            f"    {name}: ColumnUnit[{type_parameters}]"
+            f"    {name}: ColumnUnit[T]"
             for name, _ in columns
         ]
 

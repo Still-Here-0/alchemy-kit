@@ -6,10 +6,11 @@ from typing import Any
 import sqlalchemy
 
 from ..types.dialect_types import DialectTypes
+from ..resources.dialect_map import DialectMap
 from ..resources.dir_helpers import find_project_root
 
 
-class ConnectionInfo:
+class ConnectionInfo[_TypeParameters: str]:
     """Holds the details needed to connect and to locate SQL scripts.
 
     Pairs a SQLAlchemy URL with a stable identifier and the directory used to
@@ -19,7 +20,9 @@ class ConnectionInfo:
     explicitly with ``set_script_dir``.
 
     The dialect is derived from the URL's backend name, so it always stays in
-    sync with ``con_url``.
+    sync with ``con_url``. Passing ``expect`` additionally pins the dialect's
+    SQL type names (``_TypeParameters``) onto the connection, which is what
+    gives the units built from it a checked ``cast``.
 
     Attributes:
         con_url: The SQLAlchemy URL used to build engines for this connection.
@@ -29,15 +32,38 @@ class ConnectionInfo:
             resolved or set.
     """
 
-    def __init__(self, conn_url: sqlalchemy.URL, unique_id: str | None = None) -> None:
+    def __init__(
+        self,
+        conn_url: sqlalchemy.URL,
+        unique_id: str | None = None,
+        *,
+        expect: type[DialectMap[_TypeParameters]] | None = None,
+    ) -> None:
         self.script_dir: Path | None = None
         self.con_url = conn_url
         self.dialect = self._resolve_dialect(conn_url)
+        self.expect_dialect(expect)
 
         if isinstance(unique_id, str):
             self.unique_id = unique_id
         else:
             self.unique_id = ''.join(random.choices(string.ascii_letters + string.digits, k=32))
+
+    def expect_dialect(self, expect: "type[DialectMap[Any]] | None") -> None:
+        """Reject a connection whose dialect is not the expected one.
+
+        Args:
+            expect: The dialect map the caller asked for; ``None`` skips the
+                check.
+
+        Raises:
+            ValueError: If the URL resolves to a different dialect.
+        """
+        if expect is not None and expect.dialect is not self.dialect:
+            raise ValueError(
+                f"Expected a {expect.dialect} connection, but '{self.con_url}'"
+                f" is {self.dialect}"
+            )
 
     @staticmethod
     def _resolve_dialect(conn_url: sqlalchemy.URL) -> DialectTypes:

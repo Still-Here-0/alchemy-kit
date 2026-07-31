@@ -77,7 +77,7 @@ class MetadataExtractor:
     shape regardless of the connected database.
     """
 
-    def __init__(self, handler: EngineHandler) -> None:
+    def __init__(self, handler: EngineHandler[Any]) -> None:
         self._handler = handler
         self._inspector = handler.get_inspector()
         self._dialect: DialectTypes = handler._con_info.dialect

@@ -50,7 +50,7 @@ class TempBuilder(SqlBuilder):
 
     @staticmethod
     def _database_generated_columns(
-        base: type[BaseModel[Any]],
+        base: type[BaseModel],
         table_type: TempTableType,
     ) -> set[str]:
         if table_type is TempTableType.FULL:
@@ -68,10 +68,10 @@ class TempBuilder(SqlBuilder):
     def from_dataframe(
         cls,
         df: pd.DataFrame,
-        handler: EngineHandler,
+        handler: EngineHandler[Any],
         name: str,
         *,
-        base: type[BaseModel[Any]] | None = None,
+        base: type[BaseModel] | None = None,
         global_temp: bool = False,
     ) -> "TempBuilder":
         """Build a ``TempBuilder`` whose column schema is inferred from ``df``'s
@@ -91,8 +91,8 @@ class TempBuilder(SqlBuilder):
 
     def _configure(
         self,
-        base: type[BaseModel[Any]],
-        handler: EngineHandler,
+        base: type[BaseModel],
+        handler: EngineHandler[Any],
         source_name: str,
         columns: list[sa.Column[Any]],
         global_temp: bool,

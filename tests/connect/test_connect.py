@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 import sqlalchemy
 from pydantic import SecretStr
 
@@ -9,6 +10,7 @@ from alchemy_kit.connect.info_builder import (
     from_json,
     from_values_mssql,
 )
+from alchemy_kit.dialects import MssqlMap, SqliteMap
 from alchemy_kit.types.auth_types import AuthType
 from alchemy_kit.types._driver_types import SqlServerNative, SqlServerODBC
 
@@ -16,8 +18,7 @@ DIR = Path(__file__).resolve().parent.parent
 
 def test_init_info():
     a = from_json(DIR / "test_json.json")
-    assert a
-    assert all([unique_id == con.unique_id for unique_id, con in a.items()])
+    assert a.unique_id == "test"
 
     b = from_env(DIR / "dotenv_test")
     assert isinstance(b.unique_id, str)
@@ -42,6 +43,29 @@ def test_init_info():
     )
     assert isinstance(e.unique_id, str)
 
+def test_named_json_entry_is_the_one_built():
+    con = from_json(DIR / "test_json_multi.json", "second", expect=MssqlMap)
+
+    assert con.unique_id == "second"
+    assert "second_database" in str(con.con_url)
+
+
+def test_json_siblings_are_left_unbuilt():
+    con = from_json(DIR / "test_json_multi.json", "first")
+
+    assert con.unique_id == "first"
+
+
+def test_json_entry_must_be_named_when_the_file_holds_several():
+    with pytest.raises(ValueError, match="pass one of"):
+        from_json(DIR / "test_json_multi.json")
+
+
+def test_unknown_json_entry_is_rejected():
+    with pytest.raises(ValueError, match="'absent' is not in"):
+        from_json(DIR / "test_json_multi.json", "absent")
+
+
 def test_manager():
     url = sqlalchemy.URL.create("sqlite")
     info = ConnectionInfo(url, "a")
@@ -64,5 +88,35 @@ def test_engine_kwargs_enable_fast_executemany_for_pyodbc():
 def test_engine_kwargs_are_empty_for_drivers_that_batch_natively():
     for url in ("mssql+pymssql://", "postgresql+psycopg://", "oracle+oracledb://", "sqlite://"):
         assert ConnectionInfo(sqlalchemy.make_url(url)).engine_kwargs() == {}
+
+
+def test_expected_dialect_is_accepted():
+    info = ConnectionInfo(sqlalchemy.make_url("sqlite://"), expect=SqliteMap)
+
+    assert from_env(DIR / "dotenv_test", expect=MssqlMap).dialect is MssqlMap.dialect
+    assert from_json(DIR / "test_json.json", expect=MssqlMap)
+    assert info.dialect is SqliteMap.dialect
+
+
+def test_unexpected_dialect_is_rejected():
+    with pytest.raises(ValueError):
+        ConnectionInfo(sqlalchemy.make_url("sqlite://"), expect=MssqlMap)
+
+    with pytest.raises(ValueError):
+        from_env(DIR / "dotenv_test", expect=SqliteMap)
+
+    with pytest.raises(ValueError):
+        from_json(DIR / "test_json.json", expect=SqliteMap)
+
+
+def test_pooled_handler_is_rejected_for_another_dialect():
+    info = ConnectionInfo(sqlalchemy.URL.create("sqlite"), "b")
+
+    with EngineManager(None) as manager:
+        manager.create_handler(info)
+
+        assert manager.get_handler("b", SqliteMap)._con_info.dialect is SqliteMap.dialect
+        with pytest.raises(ValueError):
+            manager.get_handler("b", MssqlMap)
 
 

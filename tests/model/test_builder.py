@@ -1,3 +1,4 @@
+from re import M
 import shutil
 from pathlib import Path
 from typing import cast
@@ -239,7 +240,8 @@ def test_build_generates_grouped_package(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.local
 def test_mssql_local_build():
-    conn = info_builder.from_env(ROOT/".env-mssql")
+    from alchemy_kit.resources.dialect_map import MssqlMap
+    conn = info_builder.from_env(ROOT/".env-mssql", expect=MssqlMap)
     config = SchemaConfig()
     config.include_schema("uploader")
     build(conn, ROOT/"model"/"secret_local_mssql", schema_config=config, clear_result_dir=True)
@@ -249,6 +251,7 @@ def test_mssql_local_build():
     with EngineManager(None) as manager:
         handler = manager.create_handler(conn)
         sheet = handler.get_unit(SHEET)
+        sheet.Active.cast("date")
         select = builder.SelectBuilder(from_=sheet).limit(100)
         _, df = select.run()
         df = df[[SHEET.Description, SHEET.TableName, SHEET.LastEditedBy_fk, SHEET.Active, SHEET.DaysToRefresh, SHEET.Model, SHEET.RequestAfterUpdate]]
