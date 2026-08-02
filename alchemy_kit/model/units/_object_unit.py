@@ -30,7 +30,7 @@ class ObjectUnit[_TypeParameters: str]:
         self._base = base
         self._handler = handler
         self._selectable = (
-            table_from_model(base, handler._con_info.dialect)
+            table_from_model(base, handler.get_connection_info().dialect)
             if selectable is None
             else selectable
         )

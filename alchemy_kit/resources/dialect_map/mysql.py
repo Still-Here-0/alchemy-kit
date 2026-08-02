@@ -1,6 +1,5 @@
 from typing import cast, get_args
 
-from alchemy_kit.types.dialect_types import DialectTypes
 
 from sqlalchemy.dialects import mysql as sa_mysql
 from sqlalchemy.types import NullType
@@ -149,7 +148,8 @@ class MysqlMap(DialectMap[MysqlTypeParameters]):
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
-    dialect = DialectTypes.MYSQL
+    name = "mysql"
+    _sa_dialect_factory = sa_mysql.dialect
     dialect_paramaters = frozenset(get_args(MysqlTypeParameters))
     _quote_open = "`"
     _quote_close = "`"

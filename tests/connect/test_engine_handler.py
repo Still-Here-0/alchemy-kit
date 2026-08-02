@@ -47,7 +47,7 @@ def test_insert_data_appends_and_commits(handler: EngineHandler):
     handler.run_sql(SQL(raw_query="CREATE TABLE items (id INTEGER, name VARCHAR)"))
 
     inserted = handler.insert_data(
-        pd.DataFrame({"id": [1, 2], "name": ["a", "b"]}), "main", "items", "main"
+        pd.DataFrame({"id": [1, 2], "name": ["a", "b"]}), "main", "main", "items"
     )
     assert inserted == 2
 

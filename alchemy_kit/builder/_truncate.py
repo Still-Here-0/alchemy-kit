@@ -5,9 +5,9 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import ClauseElement
 
 from ..model.units import ObjectUnit
-from ..types.dialect_types import DialectTypes
 from ._base import SqlBuilder
 from ._utils import plain_table
+from ..resources.dialect_map import SqliteMap
 
 
 class _Truncate(ClauseElement):
@@ -22,7 +22,7 @@ def _compile_truncate(element: _Truncate, compiler: Any, **_: Any) -> str:
     return f"TRUNCATE TABLE {compiler.preparer.format_table(element.table)}"
 
 
-@compiles(_Truncate, DialectTypes.SQLITE)
+@compiles(_Truncate, SqliteMap.name)
 def _compile_truncate_sqlite(element: _Truncate, compiler: Any, **_: Any) -> str:
     return f"DELETE FROM {compiler.preparer.format_table(element.table)}"
 

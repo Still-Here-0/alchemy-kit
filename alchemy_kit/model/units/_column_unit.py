@@ -5,7 +5,6 @@ import sqlalchemy as sa
 from sqlalchemy.sql.expression import ColumnElement
 from sqlalchemy.sql.functions import Function
 
-from ...resources.dialect_map import get_map
 from ...types.sql_types import SqlScalarType
 from ..base_model import BaseModel
 
@@ -117,7 +116,7 @@ class ColumnUnit[_TypeParameters: str](_ExpressionUnit[_TypeParameters]):
         """Return a new unit casting this column to a SQL type of the
         connection's dialect."""
         assert self._handler is not None, "Cast requires a model-bound unit, this may be a bug. Report it on github."
-        dialect_map = get_map(self._handler._con_info.dialect)
+        dialect_map = self._handler.get_connection_info().dialect
         return self._unit(sa.cast(self._element, dialect_map.get_sa_type(to)))
 
     def sum(self) -> "AggregateColumnUnit[_TypeParameters]":

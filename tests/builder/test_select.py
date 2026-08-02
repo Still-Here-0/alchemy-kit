@@ -5,16 +5,23 @@ import pytest
 from alchemy_kit.builder import InsertBuilder, SelectBuilder, TempBuilder
 from alchemy_kit.connect._engine_handler import EngineHandler
 from alchemy_kit.model.units import OperandUnit
-from alchemy_kit.resources.dialect_map import get_sa_dialect
-from alchemy_kit.types.dialect_types import DialectTypes
+from alchemy_kit.resources.dialect_map import (
+    DIALECT_MAPS,
+    DialectMap,
+    MssqlMap,
+    MysqlMap,
+    OracleMap,
+    PostgresqlMap,
+    SqliteMap,
+)
 from alchemy_kit.types.errors import StatementLimitError
 
 from _helpers import MSSQL_HANDLER, SQLITE_HANDLER, items, mssql_items, parts
 
 
 def test_every_dialect_compiles_with_named_paramstyle():
-    for dialect in DialectTypes:
-        assert get_sa_dialect(dialect).paramstyle == "named"
+    for dialect in DIALECT_MAPS:
+        assert dialect.sa_dialect().paramstyle == "named"
 
 
 def test_select_render_and_parameters():
@@ -310,28 +317,26 @@ def test_operand_current_date_unsupported_on_mssql():
 def test_operand_niladic_dialect_matrix():
     from alchemy_kit.model.units import _operand_unit as ou
 
-    def rendered(element: Any, dialect: DialectTypes) -> str:
-        return str(element.compile(dialect=get_sa_dialect(dialect)))
+    def rendered(element: Any, dialect: type[DialectMap[Any]]) -> str:
+        return str(element.compile(dialect=dialect.sa_dialect()))
 
-    D = DialectTypes
-
-    assert rendered(ou._CurrentDate(), D.SQLITE) == "CURRENT_DATE"
+    assert rendered(ou._CurrentDate(), SqliteMap) == "CURRENT_DATE"
     with pytest.raises(ValueError):
-        rendered(ou._CurrentDate(), D.MSSQL)
+        rendered(ou._CurrentDate(), MssqlMap)
 
-    assert rendered(ou._CurrentTime(), D.POSTGRESQL) == "CURRENT_TIME"
-    for d in (D.MSSQL, D.ORACLE):
+    assert rendered(ou._CurrentTime(), PostgresqlMap) == "CURRENT_TIME"
+    for d in (MssqlMap, OracleMap):
         with pytest.raises(ValueError):
             rendered(ou._CurrentTime(), d)
 
-    assert rendered(ou._CurrentUser(), D.MSSQL) == "CURRENT_USER"
-    assert rendered(ou._CurrentUser(), D.ORACLE) == "USER"
+    assert rendered(ou._CurrentUser(), MssqlMap) == "CURRENT_USER"
+    assert rendered(ou._CurrentUser(), OracleMap) == "USER"
     with pytest.raises(ValueError):
-        rendered(ou._CurrentUser(), D.SQLITE)
+        rendered(ou._CurrentUser(), SqliteMap)
 
-    assert rendered(ou._SessionUser(), D.POSTGRESQL) == "SESSION_USER"
-    assert rendered(ou._SessionUser(), D.MYSQL) == "SESSION_USER()"
-    for d in (D.SQLITE, D.ORACLE):
+    assert rendered(ou._SessionUser(), PostgresqlMap) == "SESSION_USER"
+    assert rendered(ou._SessionUser(), MysqlMap) == "SESSION_USER()"
+    for d in (SqliteMap, OracleMap):
         with pytest.raises(ValueError):
             rendered(ou._SessionUser(), d)
 

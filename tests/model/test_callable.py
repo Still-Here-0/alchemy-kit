@@ -15,7 +15,7 @@ from alchemy_kit.model._model.schema_model import SchemaModel
 from alchemy_kit.model.callable_model import CallableModel, CallMetaData
 from alchemy_kit.model.units import CallableUnit
 from alchemy_kit.resources._better_logger import BetterLogger
-from alchemy_kit.types.dialect_types import DialectTypes
+from alchemy_kit.resources.dialect_map import DialectMap, MssqlMap
 
 MSSQL = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("mssql+pyodbc://")))
 MYSQL = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("mysql+pymysql://")))
@@ -38,7 +38,7 @@ def _procedure(name: str, params: list[tuple[str, str, bool]]) -> ProcedureModel
 
 
 def _db_model(procedure: ProcedureModel) -> DBModel:
-    model = DBModel("testdb", DialectTypes.MSSQL)
+    model = DBModel("testdb", MssqlMap)
     schema = SchemaModel("dbo")
     schema.callables[procedure.name] = procedure
     model.schemas["dbo"] = schema

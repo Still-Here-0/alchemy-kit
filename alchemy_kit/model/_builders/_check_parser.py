@@ -4,16 +4,16 @@ from typing import Any, NamedTuple
 import sqlglot
 from sqlglot import expressions as exp
 from sqlglot.errors import SqlglotError
+from ...resources.dialect_map import DialectMap, MariadbMap, MssqlMap, MysqlMap, OracleMap, PostgresqlMap, SqliteMap
 
-from ...types.dialect_types import DialectTypes
 
-_SQLGLOT_DIALECTS: dict[DialectTypes, str] = {
-    DialectTypes.MSSQL: "tsql",
-    DialectTypes.MYSQL: "mysql",
-    DialectTypes.MARIADB: "mysql",
-    DialectTypes.POSTGRESQL: "postgres",
-    DialectTypes.SQLITE: "sqlite",
-    DialectTypes.ORACLE: "oracle",
+_SQLGLOT_DIALECTS: dict[type[DialectMap[Any]], str] = {
+    MssqlMap: "tsql",
+    MysqlMap: "mysql",
+    MariadbMap: "mysql",
+    PostgresqlMap: "postgres",
+    SqliteMap: "sqlite",
+    OracleMap: "oracle",
 }
 
 _COMPARISON_FIELD_ARGS: dict[type[exp.Expr], str] = {
@@ -52,7 +52,7 @@ class ColumnComparisonCheck(NamedTuple):
     right_column: str
 
 
-def parse_column_check(definition: str, dialect: DialectTypes, column_name: str) -> dict[str, Any] | None:
+def parse_column_check(definition: str, dialect: type[DialectMap[Any]], column_name: str) -> dict[str, Any] | None:
     """Translate a single-column CHECK definition into ``pandera.Field``
     keyword arguments (``gt``/``ge``/``lt``/``le``/``eq``/``ne``/``isin``).
 
@@ -68,7 +68,7 @@ def parse_column_check(definition: str, dialect: DialectTypes, column_name: str)
     return _field_args(node, column_name)
 
 
-def parse_table_check(definition: str, dialect: DialectTypes) -> ColumnComparisonCheck | None:
+def parse_table_check(definition: str, dialect: type[DialectMap[Any]]) -> ColumnComparisonCheck | None:
     """Translate a table-level CHECK into a two-column comparison, returning
     ``None`` for any other shape."""
     node = _parse(definition, dialect)
@@ -102,7 +102,7 @@ _FILTER_OPERATORS: dict[type[exp.Expr], str] = {
 }
 
 
-def parse_index_filter(definition: str, dialect: DialectTypes) -> list[IndexFilterCondition] | None:
+def parse_index_filter(definition: str, dialect: type[DialectMap[Any]]) -> list[IndexFilterCondition] | None:
     """Translate a filtered-index WHERE clause into mask conditions.
 
     Supports ``<col> IS NOT NULL``, ``<col> = <literal>``, ``<col> <> <literal>``
@@ -163,7 +163,7 @@ def _not_null_condition(node: exp.Not) -> list[IndexFilterCondition] | None:
     return [IndexFilterCondition(column.name, "is_not_null", None)]
 
 
-def _parse(definition: str, dialect: DialectTypes) -> exp.Expr | None:
+def _parse(definition: str, dialect: type[DialectMap[Any]]) -> exp.Expr | None:
     try:
         parsed = sqlglot.parse_one(definition, read=_SQLGLOT_DIALECTS[dialect])
     except SqlglotError:

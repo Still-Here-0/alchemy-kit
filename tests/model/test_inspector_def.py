@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 
 import pandas as pd
 import pytest
@@ -13,7 +13,7 @@ from alchemy_kit.model._model_def import MetadataExtractor
 from alchemy_kit.model._schema_config import SchemaConfig
 from alchemy_kit.model._utils import parse_db
 from alchemy_kit.resources._better_logger import BetterLogger
-from alchemy_kit.types.dialect_types import DialectTypes
+from alchemy_kit.resources.dialect_map import DIALECT_MAPS, DialectMap, MssqlMap, OracleMap
 
 LOGGER = BetterLogger(logging.getLogger("test_inspector_def"))
 
@@ -162,14 +162,17 @@ class _UnreflectableInspector:
 class _FallbackHandler:
     def __init__(
         self,
-        dialect: DialectTypes,
+        dialect: type[DialectMap[Any]],
         results: dict[str, pd.DataFrame],
         raw_result: pd.DataFrame | None = None,
     ):
-        self._con_info = SimpleNamespace(dialect=dialect)
+        self._connection_info = SimpleNamespace(dialect=dialect)
         self._results = results
         self._raw_result = pd.DataFrame() if raw_result is None else raw_result
         self.executed: list = []
+
+    def get_connection_info(self):
+        return self._connection_info
 
     def get_inspector(self):
         return _UnreflectableInspector()
@@ -188,7 +191,7 @@ class _FallbackHandler:
 
 @pytest.fixture
 def mssql_fallback_handler() -> _FallbackHandler:
-    return _FallbackHandler(DialectTypes.MSSQL, {
+    return _FallbackHandler(MssqlMap, {
         "unique": pd.DataFrame({
             "constraint_name": ["uq_users_pair", "uq_users_pair", "uq_users_email"],
             "column_name": ["id", "age", "email"],
@@ -228,7 +231,7 @@ def test_check_constraints_fallback_on_mssql(mssql_fallback_handler: _FallbackHa
 
 
 def test_fallback_degrades_to_empty_without_dialect_sql():
-    handler = _FallbackHandler(DialectTypes.ORACLE, {})
+    handler = _FallbackHandler(OracleMap, {})
     extractor = MetadataExtractor(cast(EngineHandler, handler))
 
     assert extractor.list_check_constraints("app", "users").empty
@@ -251,15 +254,15 @@ def test_current_database_is_none_without_a_named_database():
 
 def test_current_database_ignores_the_url_and_asks_the_connection():
     url = sqlalchemy.make_url("mssql+pyodbc://host/master")
-    handler = _FallbackHandler(DialectTypes.MSSQL, {}, pd.DataFrame({"": ["sales_db"]}))
+    handler = _FallbackHandler(MssqlMap, {}, pd.DataFrame({"": ["sales_db"]}))
 
     assert url.database == "master"
     assert MetadataExtractor(cast(EngineHandler, handler)).current_database() == "sales_db"
     assert handler.executed[0].raw_query == "SELECT DB_NAME()"
 
 
-@pytest.mark.parametrize("dialect", list(DialectTypes))
-def test_every_dialect_can_be_asked_for_its_database(dialect: DialectTypes):
+@pytest.mark.parametrize("dialect", list(DIALECT_MAPS))
+def test_every_dialect_can_be_asked_for_its_database(dialect: type[DialectMap[Any]]):
     handler = _FallbackHandler(dialect, {}, pd.DataFrame({"": ["some_db"]}))
 
     assert MetadataExtractor(cast(EngineHandler, handler)).current_database() == "some_db"

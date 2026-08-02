@@ -35,13 +35,27 @@ class EngineHandler[_TypeParameters: str]:
         compiled with its dialect."""
         return model._get_unit(self)
 
+    def get_connection_info(self) -> ConnectionInfo[_TypeParameters]:
+        """Return the current ``ConnectionInfo`` used by the handler"""
+        return self._con_info
+
     def get_inspector(self) -> sqlalchemy.Inspector:
-        """Return a SQLAlchemy ``Inspector`` bound to this handler's engine."""
+        """Return a SQLAlchemy ``Inspector`` bound to this handler's engine.
+
+        Reads the database's schema rather than its rows. Rarely needed
+        directly: this is how the package reflects a database into the
+        generated models (``model.build``).
+        """
         return sqlalchemy.inspect(self._engine)
 
     def quote_identifier(self, identifier: str) -> str:
-        """Quote a schema/table/column name using this engine's dialect rules."""
-        return self._engine.dialect.identifier_preparer.quote(identifier)
+        """Quote a schema/table/column name with this connection's dialect
+        delimiters.
+
+        For naming an object inside a hand-written ``SQL`` query, where the
+        name is text rather than a bound parameter.
+        """
+        return self._con_info.dialect.quote_identifier(identifier)
 
     def run_sql(self, sql: SQL) -> tuple[int | None, pd.DataFrame]:
         """Run one statement on its own connection and return its
@@ -177,8 +191,8 @@ class EngineHandler[_TypeParameters: str]:
         self,
         data: pd.DataFrame,
         database_name: str,
-        table_name: str,
         schema_name: str,
+        table_name: str,
         *,
         truncate: bool = False,
         if_exists: Literal["fail", "replace", "append", "delete_rows"] = "append"

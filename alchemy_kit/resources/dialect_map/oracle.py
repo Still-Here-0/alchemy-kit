@@ -1,6 +1,5 @@
 from typing import cast, get_args
 
-from alchemy_kit.types.dialect_types import DialectTypes
 
 from sqlalchemy.dialects import oracle as sa_oracle
 from sqlalchemy.types import INTEGER, NullType, SMALLINT
@@ -122,7 +121,8 @@ class OracleMap(DialectMap[OracleTypeParameters]):
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
-    dialect = DialectTypes.ORACLE
+    name = "oracle"
+    _sa_dialect_factory = sa_oracle.dialect
     dialect_paramaters = frozenset(get_args(OracleTypeParameters))
     limits = StatementLimits(max_params=65535)
 

@@ -3,12 +3,14 @@ from collections.abc import Callable
 from typing import Any, ClassVar, NamedTuple, Protocol, runtime_checkable
 
 import sqlalchemy as sa
+from sqlalchemy.engine import Dialect
 
-from ...types.dialect_types import DialectTypes
+from ...types.dialect_types import DialectTypesInput
 from ...types.py_type_parameters import PyTypeParameters
 from ...types.statement_limits import StatementLimits
 
 type SaTypeFactory = Callable[[], sa.types.TypeEngine[Any]]
+type SaDialectFactory = Callable[..., Dialect]
 
 
 class ReflectedTypeFacts(NamedTuple):
@@ -51,17 +53,31 @@ class DialectMap[_TypeParameters: str](ABC):
     typo'd key is flagged statically; a runtime guard enforces completeness.
     ``dialect_paramaters`` is the runtime companion of ``_TypeParameters`` —
     the same names as a ``frozenset`` for membership checks.
+
+    A map *is* its dialect: ``name`` is the dialect's identity, and the class
+    itself is what callers pass and compare.
     """
-    dialect: ClassVar[DialectTypes]
+    name: ClassVar[DialectTypesInput]
     dialect_paramaters: ClassVar[frozenset[str]]
     py_types: ClassVar[dict[str, PyTypeParameters]]
     sa_types: ClassVar[dict[str, SaTypeFactory]]
+    _sa_dialect_factory: ClassVar[SaDialectFactory]
     _reflected_synonyms: ClassVar[dict[str, str]] = {}
 
     _quote_open: ClassVar[str] = '"'
     _quote_close: ClassVar[str] = '"'
 
     limits: ClassVar[StatementLimits]
+
+    @classmethod
+    def sa_dialect(cls) -> Dialect:
+        """Return a SQLAlchemy dialect instance for compiling Core statements.
+
+        ``paramstyle="named"`` forces ``:param`` placeholders regardless of the
+        DBAPI's default (e.g. ``qmark`` on pyodbc), which is what ``SQL`` /
+        ``EngineHandler.run_sql`` expect.
+        """
+        return cls._sa_dialect_factory(paramstyle="named")
 
     @classmethod
     def quote_identifier(cls, name: str) -> str:

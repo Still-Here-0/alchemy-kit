@@ -2,12 +2,11 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from ..resources.dialect_map import DialectMap, get_map
-from ..types.dialect_types import DialectTypes
+from ..resources.dialect_map import DialectMap
 from ._builders._column_metadata import ColumnMetadata
 from .base_model import BaseModel
 
-_TABLES: dict[tuple[type[BaseModel], DialectTypes], sa.Table] = {}
+_TABLES: dict[tuple[type[BaseModel], type[DialectMap[Any]]], sa.Table] = {}
 
 
 def _column_from_model(name: str, column: Any, dialect_map: type[DialectMap[Any]]) -> sa.Column[Any]:
@@ -24,7 +23,7 @@ def _column_from_model(name: str, column: Any, dialect_map: type[DialectMap[Any]
     )
 
 
-def table_from_model(base: type[BaseModel], dialect: DialectTypes) -> sa.Table:
+def table_from_model(base: type[BaseModel], dialect: type[DialectMap[Any]]) -> sa.Table:
     """Return the SQLAlchemy Core ``Table`` for a generated model, built in
     memory from the model's metadata (no reflection) and cached per
     ``(model, dialect)``.
@@ -35,7 +34,7 @@ def table_from_model(base: type[BaseModel], dialect: DialectTypes) -> sa.Table:
     """
     if (base, dialect) not in _TABLES:
         metadata = base.Config.metadata
-        dialect_map = get_map(dialect)
+        dialect_map = dialect
         _TABLES[base, dialect] = sa.Table(
             metadata["obj_name"],
             sa.MetaData(),

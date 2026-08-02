@@ -4,26 +4,26 @@ import sqlalchemy as sa
 from sqlalchemy.sql import sqltypes
 
 from ...resources._compiler import new_sql_type
-from ...types.dialect_types import DialectTypes
 from ._column_unit import AggregateColumnUnit, ColumnUnit, WindowFunctionUnit
+from ...resources.dialect_map import MariadbMap, MssqlMap, MysqlMap, OracleMap, SqliteMap
 
-_CurrentDate = new_sql_type("_CurrentDate", "CURRENT_DATE", sqltypes.Date(), unsupported=(DialectTypes.MSSQL,))
+_CurrentDate = new_sql_type("_CurrentDate", "CURRENT_DATE", sqltypes.Date(), unsupported=(MssqlMap,))
 _CurrentTime = new_sql_type(
-    "_CurrentTime", "CURRENT_TIME", sqltypes.Time(), unsupported=(DialectTypes.MSSQL, DialectTypes.ORACLE)
+    "_CurrentTime", "CURRENT_TIME", sqltypes.Time(), unsupported=(MssqlMap, OracleMap)
 )
 _CurrentUser = new_sql_type(
     "_CurrentUser",
     "CURRENT_USER",
     sqltypes.String(),
-    unsupported=(DialectTypes.SQLITE,),
-    overrides={DialectTypes.ORACLE: "USER"},
+    unsupported=(SqliteMap,),
+    overrides={OracleMap: "USER"},
 )
 _SessionUser = new_sql_type(
     "_SessionUser",
     "SESSION_USER",
     sqltypes.String(),
-    unsupported=(DialectTypes.SQLITE, DialectTypes.ORACLE),
-    overrides={DialectTypes.MYSQL: "SESSION_USER()", DialectTypes.MARIADB: "SESSION_USER()"},
+    unsupported=(SqliteMap, OracleMap),
+    overrides={MysqlMap: "SESSION_USER()", MariadbMap: "SESSION_USER()"},
 )
 
 

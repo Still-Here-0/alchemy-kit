@@ -1,12 +1,11 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from ...connect._engine_handler import EngineHandler
 from ...resources._identifiers import Identifiers
 from ...resources._sql import SQL
-from ...resources.dialect_map import get_type
-from ...types import DialectTypes
+from ...resources.dialect_map import DialectMap
 from .. import units
 from .._model.procedure_model import ParameterModel, ProcedureModel
 from ..callable_model import CallableModel
@@ -21,7 +20,7 @@ class CallableStubFileBuilder:
     class_name: str
     file_path: Path
     procedure_model: ProcedureModel
-    db_dialect: DialectTypes
+    db_dialect: type[DialectMap[Any]]
 
     def build(self) -> str:
         file_data = self.template.read_text("UTF-8").format(
@@ -44,5 +43,5 @@ class CallableStubFileBuilder:
         )
 
     def _parameter_type(self, parameter: ParameterModel) -> str:
-        py_type = get_type(self.db_dialect, parameter.type)
+        py_type = self.db_dialect.get_py_type(parameter.type)
         return f"Optional[{py_type}]" if parameter.is_nullable else py_type

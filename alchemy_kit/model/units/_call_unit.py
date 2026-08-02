@@ -7,8 +7,7 @@ from sqlalchemy.sql.elements import BindParameter
 from sqlalchemy.sql.expression import ClauseElement
 
 from ...resources._sql import SQL
-from ...resources.dialect_map import get_sa_dialect
-from ...types.dialect_types import DialectTypes
+from ...resources.dialect_map import MssqlMap, SqliteMap
 from ...types.sql_types import SqlScalarType
 from ..callable_model import CallableModel
 
@@ -30,13 +29,13 @@ def _compile_call(element: _Call, compiler: Any, **kw: Any) -> str:
     return f"CALL {element.reference}({args})"
 
 
-@compiles(_Call, DialectTypes.MSSQL)
+@compiles(_Call, MssqlMap.name)
 def _compile_call_mssql(element: _Call, compiler: Any, **kw: Any) -> str:
     args = ", ".join(compiler.process(param, **kw) for param in element.bind_params)
     return f"EXEC {element.reference} {args}".rstrip()
 
 
-@compiles(_Call, DialectTypes.SQLITE)
+@compiles(_Call, SqliteMap.name)
 def _compile_call_sqlite(element: _Call, compiler: Any, **kw: Any) -> str:
     raise ValueError("SQLite does not support stored procedure calls")
 
@@ -82,7 +81,7 @@ class CallableUnit:
         return _Call(reference, bind_params)
 
     def _compile(self, args: tuple[SqlScalarType, ...]) -> sa.Compiled:
-        dialect = get_sa_dialect(self._handler._con_info.dialect)
+        dialect = self._handler.get_connection_info().dialect.sa_dialect()
         return self._element(args).compile(
             dialect=dialect,
             compile_kwargs={"render_postcompile": True},

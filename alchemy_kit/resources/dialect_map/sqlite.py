@@ -1,6 +1,5 @@
 from typing import cast, get_args
 
-from alchemy_kit.types.dialect_types import DialectTypes
 
 from sqlalchemy.dialects import sqlite as sa_sqlite
 from sqlalchemy.types import BIGINT, CLOB, DOUBLE, DOUBLE_PRECISION, NCHAR, NVARCHAR, SMALLINT
@@ -102,7 +101,8 @@ class SqliteMap(DialectMap[SqliteTypeParameters]):
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
-    dialect = DialectTypes.SQLITE
+    name = "sqlite"
+    _sa_dialect_factory = sa_sqlite.dialect
     dialect_paramaters = frozenset(get_args(SqliteTypeParameters))
     limits = StatementLimits(max_params=32766)
 

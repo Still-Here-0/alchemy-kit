@@ -1,6 +1,5 @@
 from typing import cast, get_args
 
-from alchemy_kit.types.dialect_types import DialectTypes
 
 from sqlalchemy import UUID
 from sqlalchemy.dialects import mysql as sa_mysql
@@ -159,7 +158,8 @@ class MariadbMap(DialectMap[MariadbTypeParameters]):
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
-    dialect = DialectTypes.MARIADB
+    name = "mariadb"
+    _sa_dialect_factory = sa_mariadb.MariaDBDialect
     dialect_paramaters = frozenset(get_args(MariadbTypeParameters))
     _quote_open = "`"
     _quote_close = "`"

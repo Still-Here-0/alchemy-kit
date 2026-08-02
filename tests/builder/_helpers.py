@@ -7,7 +7,7 @@ from pandera.typing import Series
 from alchemy_kit.connect._engine_handler import EngineHandler
 from alchemy_kit.connect._info import ConnectionInfo
 from alchemy_kit.model.base_model import BaseModel, MetaData
-from alchemy_kit.dialects import MssqlMap, OracleMap, SqliteMap
+from alchemy_kit.resources.dialects import MssqlMap, OracleMap, SqliteMap
 
 
 class items(BaseModel):

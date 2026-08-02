@@ -8,10 +8,10 @@ from ..connect._engine_handler import EngineHandler
 from ..model.base_model import BaseModel
 from ..model._builders._column_metadata import ColumnMetadata
 from ..model.units import ObjectUnit
-from ..types.dialect_types import DialectTypes
 from ..types.temp_table_types import TempTableType
 from ._base import SqlBuilder
 from ._utils import DataFrameTemp, sa_type_from_series
+from ..resources.dialect_map import MssqlMap, OracleMap
 
 
 class TempBuilder(SqlBuilder):
@@ -99,14 +99,14 @@ class TempBuilder(SqlBuilder):
     ) -> None:
         SqlBuilder.__init__(self, base, handler)
 
-        dialect = handler._con_info.dialect
+        dialect = handler.get_connection_info().dialect
         temp_name = f"TEMP_{source_name}"
         prefixes: list[str] = ["TEMPORARY"]
 
-        if dialect is DialectTypes.MSSQL:
+        if dialect is MssqlMap:
             temp_name = f"{'##' if global_temp else '#'}{temp_name}"
             prefixes = []
-        elif dialect is DialectTypes.ORACLE:
+        elif dialect is OracleMap:
             prefixes = ["GLOBAL TEMPORARY"]
         elif global_temp:
             raise ValueError(f"{dialect} does not support global temporary tables")

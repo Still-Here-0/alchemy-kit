@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from ...connect._engine_handler import EngineHandler
-from ...resources.dialect_map import get_type
-from ...types import DialectTypes
+from ...resources.dialect_map import DialectMap
 from .._model.column_model import ColumnModel
 from .._model.object_model import ObjectModel
 from ..base_model import BaseModel
@@ -19,7 +18,7 @@ class StubFileBuilder:
     class_name: str
     file_path: Path
     object_model: ObjectModel
-    db_dialect: DialectTypes
+    db_dialect: type[DialectMap[Any]]
     column_names: dict[str, str]
 
     def build(self) -> str:
@@ -54,7 +53,7 @@ class StubFileBuilder:
         return file_data
 
     def _get_column_type(self, column_model: ColumnModel) -> str:
-        py_type = get_type(self.db_dialect, column_model.type)
+        py_type = self.db_dialect.get_py_type(column_model.type)
         return f"Series[{py_type}]"
 
     @staticmethod

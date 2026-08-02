@@ -12,7 +12,6 @@ from ..model.base_model import BaseModel
 from ..model.units._column_unit import _ExpressionUnit
 from ..model.units._object_unit import ObjectUnit
 from ..resources._sql import SQL
-from ..resources.dialect_map import get_map, get_sa_dialect
 from ..types.errors import StatementLimitError
 
 
@@ -36,7 +35,7 @@ class SqlBuilder(ABC):
         """Return the Core statement this builder currently describes."""
 
     def _sa_dialect(self) -> Dialect:
-        return get_sa_dialect(self._handler._con_info.dialect)
+        return self._handler.get_connection_info().dialect.sa_dialect()
 
     def _compile(self) -> Compiled:
         return self._statement().compile(
@@ -57,8 +56,8 @@ class SqlBuilder(ABC):
     def _checked(self, sql: SQL) -> SQL:
         """Return ``sql`` once its statement fits the dialect's parameter
         budget, raising :class:`StatementLimitError` when it does not."""
-        dialect = self._handler._con_info.dialect
-        budget = get_map(dialect).limits.param_budget
+        dialect = self._handler.get_connection_info().dialect
+        budget = dialect.limits.param_budget
         needed = len(sql.parameter_names())
 
         if needed <= budget:
@@ -75,7 +74,7 @@ class SqlBuilder(ABC):
                 " statement; write fewer columns at a time"
             )
 
-        raise StatementLimitError(dialect, needed, budget, remedy)
+        raise StatementLimitError(dialect.name, needed, budget, remedy)
 
     def render(self) -> str:
         """Return the compiled SQL string with ``:name`` placeholders for bound

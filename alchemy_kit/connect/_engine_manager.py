@@ -1,14 +1,31 @@
 from contextlib import AbstractContextManager
 from logging import Logger
 from types import TracebackType
-from typing import Any, Optional, Self, NamedTuple, TypeAlias, cast
+from typing import Any, Literal, Optional, Self, NamedTuple, TypeAlias, cast, overload
 
 import sqlalchemy
 
 from ..resources._better_logger import BetterLogger
-from ..resources.dialect_map import DialectMap
+from ..resources.dialect_map import (
+    DialectLike,
+    DialectMap,
+    MariadbMap,
+    MssqlMap,
+    MysqlMap,
+    OracleMap,
+    PostgresqlMap,
+    SqliteMap,
+)
 from ._engine_handler import EngineHandler
 from ._info import ConnectionInfo
+from ..types.sql_type_parameters import (
+    MariadbTypeParameters,
+    MssqlTypeParameters,
+    MysqlTypeParameters,
+    OracleTypeParameters,
+    PostgresqlTypeParameters,
+    SqliteTypeParameters,
+)
 
 class _EngineInfo(NamedTuple):
     engine: sqlalchemy.Engine
@@ -99,9 +116,25 @@ class EngineManager(AbstractContextManager):
             "EngineHandler[_TypeParameters]", self.get_handler(con_info.unique_id)
         )
 
-    def get_handler[_TypeParameters: str](
-        self, key: str, expect: type[DialectMap[_TypeParameters]] | None = None
-    ) -> EngineHandler[_TypeParameters]:
+    @overload
+    def get_handler(self, key: str, expect: Literal["mssql"] | type[MssqlMap]) -> EngineHandler[MssqlTypeParameters]: ...
+    @overload
+    def get_handler(self, key: str, expect: Literal["mysql"] | type[MysqlMap]) -> EngineHandler[MysqlTypeParameters]: ...
+    @overload
+    def get_handler(self, key: str, expect: Literal["mariadb"] | type[MariadbMap]) -> EngineHandler[MariadbTypeParameters]: ...
+    @overload
+    def get_handler(self, key: str, expect: Literal["postgresql"] | type[PostgresqlMap]) -> EngineHandler[PostgresqlTypeParameters]: ...
+    @overload
+    def get_handler(self, key: str, expect: Literal["oracle"] | type[OracleMap]) -> EngineHandler[OracleTypeParameters]: ...
+    @overload
+    def get_handler(self, key: str, expect: Literal["sqlite"] | type[SqliteMap]) -> EngineHandler[SqliteTypeParameters]: ...
+    @overload
+    def get_handler[_TypeParameters: str](self, key: str, expect: type[DialectMap[_TypeParameters]]) -> EngineHandler[_TypeParameters]: ...
+    @overload
+    def get_handler(self, key: str, expect: None = None) -> EngineHandler[Any]: ...
+    def get_handler(
+        self, key: str, expect: DialectLike | None = None
+    ) -> EngineHandler[Any]:
         """Build an additional handler for an already-pooled engine.
 
         Each call returns a new handler sharing the pooled engine; the handler

@@ -180,8 +180,8 @@ Notes on returning:
    `_compiler.py` does for functions like `CURRENT_DATE` on MSSQL.
 
 3. MariaDB compiles correctly as it is; no `@compiles` override is needed. Its
-   flag is misleading rather than accurate: the dialect `get_sa_dialect` builds
-   has never connected, and MariaDB only learns its own version — and sets the
+   flag is misleading rather than accurate: the dialect `DialectMap.sa_dialect`
+   builds has never connected, and MariaDB only learns its own version — and sets the
    flag from it — during `initialize()` on first connect. Real support is INSERT
    from 10.5 and DELETE from 10.0.5; `UPDATE ... RETURNING` does not exist.
 4. Oracle returns nothing to fetch. `RETURNING id INTO :ret_0` hands the values

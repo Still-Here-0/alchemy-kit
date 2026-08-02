@@ -11,8 +11,7 @@ from sqlalchemy.exc import NoSuchTableError
 from ...connect._engine_handler import EngineHandler
 from ...resources._pandas import none_if_na
 from ...resources._sql import SQL
-from ...resources.dialect_map import DialectMap, ReflectedTypeFacts, get_map
-from ...types.dialect_types import DialectTypes
+from ...resources.dialect_map import DialectMap, MariadbMap, MssqlMap, MysqlMap, OracleMap, PostgresqlMap, ReflectedTypeFacts, SqliteMap, get_map
 from .._schema_config import SchemaConfig
 from ._frames import (
     ListCheckConstraints,
@@ -25,47 +24,47 @@ from ._frames import (
     ListUniqueClusters,
 )
 
-_INFO_SCHEMA_ROUTINE_DIALECTS: frozenset[DialectTypes] = frozenset({
-    DialectTypes.MSSQL,
-    DialectTypes.MYSQL,
-    DialectTypes.MARIADB,
-    DialectTypes.POSTGRESQL,
+_INFO_SCHEMA_ROUTINE_DIALECTS: frozenset[type[DialectMap[Any]]] = frozenset({
+    MssqlMap,
+    MysqlMap,
+    MariadbMap,
+    PostgresqlMap,
 })
 
-_SYSTEM_SCHEMAS: dict[DialectTypes, frozenset[str]] = {
-    DialectTypes.MSSQL: frozenset({"information_schema", "sys", "guest"}),
-    DialectTypes.MYSQL: frozenset({"information_schema", "performance_schema", "mysql", "sys"}),
-    DialectTypes.MARIADB: frozenset({"information_schema", "performance_schema", "mysql", "sys"}),
-    DialectTypes.POSTGRESQL: frozenset({"information_schema", "pg_catalog", "pg_toast"}),
-    DialectTypes.SQLITE: frozenset(),
-    DialectTypes.ORACLE: frozenset({
+_SYSTEM_SCHEMAS: dict[type[DialectMap[Any]], frozenset[str]] = {
+    MssqlMap: frozenset({"information_schema", "sys", "guest"}),
+    MysqlMap: frozenset({"information_schema", "performance_schema", "mysql", "sys"}),
+    MariadbMap: frozenset({"information_schema", "performance_schema", "mysql", "sys"}),
+    PostgresqlMap: frozenset({"information_schema", "pg_catalog", "pg_toast"}),
+    SqliteMap: frozenset(),
+    OracleMap: frozenset({
         "sys", "system", "outln", "xdb", "ctxsys", "mdsys", "ordsys", "orddata",
         "dbsnmp", "appqossys", "wmsys", "olapsys", "lbacsys", "gsmadmin_internal",
     }),
 }
 
-_SYSTEM_SCHEMA_PREFIXES: dict[DialectTypes, tuple[str, ...]] = {
-    DialectTypes.MSSQL: ("db_",),
-    DialectTypes.POSTGRESQL: ("pg_",),
+_SYSTEM_SCHEMA_PREFIXES: dict[type[DialectMap[Any]], tuple[str, ...]] = {
+    MssqlMap: ("db_",),
+    PostgresqlMap: ("pg_",),
 }
 
 _FALLBACK_SQL_DIR = Path(__file__).parent / "_sql"
 
-_UNIQUE_CONSTRAINTS_FALLBACK_SQL: dict[DialectTypes, str] = {
-    DialectTypes.MSSQL: "mssql_unique_constraints",
+_UNIQUE_CONSTRAINTS_FALLBACK_SQL: dict[type[DialectMap[Any]], str] = {
+    MssqlMap: "mssql_unique_constraints",
 }
 
-_CHECK_CONSTRAINTS_FALLBACK_SQL: dict[DialectTypes, str] = {
-    DialectTypes.MSSQL: "mssql_check_constraints",
+_CHECK_CONSTRAINTS_FALLBACK_SQL: dict[type[DialectMap[Any]], str] = {
+    MssqlMap: "mssql_check_constraints",
 }
 
-_CURRENT_DATABASE_SQL: dict[DialectTypes, str] = {
-    DialectTypes.MSSQL: "SELECT DB_NAME()",
-    DialectTypes.POSTGRESQL: "SELECT current_database()",
-    DialectTypes.MYSQL: "SELECT DATABASE()",
-    DialectTypes.MARIADB: "SELECT DATABASE()",
-    DialectTypes.ORACLE: "SELECT SYS_CONTEXT('USERENV', 'DB_NAME') FROM dual",
-    DialectTypes.SQLITE: "SELECT file FROM pragma_database_list() WHERE name = 'main'",
+_CURRENT_DATABASE_SQL: dict[type[DialectMap[Any]], str] = {
+    MssqlMap: "SELECT DB_NAME()",
+    PostgresqlMap: "SELECT current_database()",
+    MysqlMap: "SELECT DATABASE()",
+    MariadbMap: "SELECT DATABASE()",
+    OracleMap: "SELECT SYS_CONTEXT('USERENV', 'DB_NAME') FROM dual",
+    SqliteMap: "SELECT file FROM pragma_database_list() WHERE name = 'main'",
 }
 
 
@@ -80,7 +79,7 @@ class MetadataExtractor:
     def __init__(self, handler: EngineHandler[Any]) -> None:
         self._handler = handler
         self._inspector = handler.get_inspector()
-        self._dialect: DialectTypes = handler._con_info.dialect
+        self._dialect: type[DialectMap[Any]] = handler.get_connection_info().dialect
         self._columns_cache: dict[tuple[str, str], list[dict[str, Any]]] = {}
 
     def list_schemas(self, schema_conf: SchemaConfig) -> DataFrame[ListSchemas]:
@@ -437,7 +436,7 @@ class MetadataExtractor:
             for row in data.itertuples(index=False)
         ]
 
-    def _run_fallback_sql(self, sql_names: Mapping[DialectTypes, str], schema_name: str, object_name: str) -> pd.DataFrame | None:
+    def _run_fallback_sql(self, sql_names: Mapping[type[DialectMap[Any]], str], schema_name: str, object_name: str) -> pd.DataFrame | None:
         sql_name = sql_names.get(self._dialect)
         if sql_name is None:
             return None
@@ -480,7 +479,7 @@ class MetadataExtractor:
 
     def _type_facts(self, sa_type: Any) -> ReflectedTypeFacts:
         try:
-            dialect_map = get_map(self._dialect)
+            dialect_map = self._dialect
         except ValueError:
             return DialectMap.reflected_type_facts(sa_type)
         return dialect_map.reflected_type_facts(sa_type)

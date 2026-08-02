@@ -1,6 +1,5 @@
 from typing import cast, get_args
 
-from alchemy_kit.types.dialect_types import DialectTypes
 
 from sqlalchemy.dialects import postgresql as sa_pg
 from sqlalchemy.types import NullType
@@ -214,7 +213,8 @@ class PostgresqlMap(DialectMap[PostgresqlTypeParameters]):
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
-    dialect = DialectTypes.POSTGRESQL
+    name = "postgresql"
+    _sa_dialect_factory = sa_pg.dialect
     dialect_paramaters = frozenset(get_args(PostgresqlTypeParameters))
     limits = StatementLimits(max_params=65535)
 

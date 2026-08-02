@@ -1,4 +1,4 @@
-from ..dialect_types import DialectTypes
+from ..dialect_types import DialectTypesInput
 
 
 class StatementLimitError(ValueError):
@@ -9,7 +9,7 @@ class StatementLimitError(ValueError):
     values or to target fewer columns.
     """
 
-    def __init__(self, dialect: DialectTypes, needed: int, budget: int, remedy: str) -> None:
+    def __init__(self, dialect: DialectTypesInput, needed: int, budget: int, remedy: str) -> None:
         self.dialect = dialect
         self.needed = needed
         self.budget = budget

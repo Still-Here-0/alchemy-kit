@@ -1,16 +1,6 @@
-from collections.abc import Callable
-from typing import NamedTuple
+from typing import Any, Literal, overload
 
-from sqlalchemy.dialects import mssql as sa_mssql
-from sqlalchemy.dialects import mysql as sa_mysql
-from sqlalchemy.dialects import oracle as sa_oracle
-from sqlalchemy.dialects import postgresql as sa_postgresql
-from sqlalchemy.dialects import sqlite as sa_sqlite
-from sqlalchemy.dialects.mysql import mariadb as sa_mariadb
-from sqlalchemy.engine import Dialect
-
-from ...types.dialect_types import DialectTypes
-from ...types.py_type_parameters import PyTypeParameters
+from ...types.dialect_types import DialectTypesInput
 from ._base import ColumnLike, DialectMap, ReflectedTypeFacts
 from .mariadb import MariadbMap
 from .mssql import MssqlMap
@@ -20,7 +10,9 @@ from .postgresql import PostgresqlMap
 from .sqlite import SqliteMap
 
 __all__ = [
+    "DIALECT_MAPS",
     "ColumnLike",
+    "DialectLike",
     "DialectMap",
     "MariadbMap",
     "MssqlMap",
@@ -30,66 +22,56 @@ __all__ = [
     "ReflectedTypeFacts",
     "SqliteMap",
     "get_map",
-    "get_sa_dialect",
-    "get_str_length",
-    "get_type",
-    "render_reference",
-    "render_type",
+    "resolve_map",
 ]
 
-class _DialectEntry(NamedTuple):
-    parameter_map: type[DialectMap]
-    sa_dialect: Callable[..., Dialect]
+DIALECT_MAPS: tuple[type[DialectMap[Any]], ...] = (
+    MssqlMap,
+    MysqlMap,
+    MariadbMap,
+    PostgresqlMap,
+    OracleMap,
+    SqliteMap,
+)
 
-
-_REGISTRY: dict[DialectTypes, _DialectEntry] = {
-    DialectTypes.MSSQL: _DialectEntry(MssqlMap, sa_mssql.dialect),
-    DialectTypes.MYSQL: _DialectEntry(MysqlMap, sa_mysql.dialect),
-    DialectTypes.MARIADB: _DialectEntry(MariadbMap, sa_mariadb.MariaDBDialect),
-    DialectTypes.POSTGRESQL: _DialectEntry(PostgresqlMap, sa_postgresql.dialect),
-    DialectTypes.ORACLE: _DialectEntry(OracleMap, sa_oracle.dialect),
-    DialectTypes.SQLITE: _DialectEntry(SqliteMap, sa_sqlite.dialect),
+_REGISTRY: dict[str, type[DialectMap[Any]]] = {
+    dialect_map.name: dialect_map for dialect_map in DIALECT_MAPS
 }
 
 
-def get_map(dialect: DialectTypes) -> type[DialectMap]:
-    """Return the resource class registered for ``dialect``."""
-    try:
-        return _REGISTRY[dialect].parameter_map
-    except KeyError:
-        raise ValueError(f"Dialect not mapped on dialect_map: {dialect}") from None
+type DialectLike = DialectTypesInput | type[DialectMap[Any]]
 
 
-def get_sa_dialect(dialect: DialectTypes) -> Dialect:
-    """Return a SQLAlchemy dialect instance for compiling Core statements.
+def resolve_map(dialect: DialectLike) -> type[DialectMap[Any]]:
+    """Return the map for either form a caller may pass — the dialect's name or
+    the map itself."""
+    return get_map(dialect) if isinstance(dialect, str) else dialect
 
-    ``paramstyle="named"`` forces ``:param`` placeholders regardless of the
-    DBAPI's default (e.g. ``qmark`` on pyodbc), which is what ``SQL`` /
-    ``EngineHandler.run_sql`` expect. MariaDB gets its own dialect class so
-    MariaDB-only types (``INET4``, ``INET6``, native ``uuid``) render.
+
+@overload
+def get_map(name: Literal["mssql"]) -> type[MssqlMap]: ...
+@overload
+def get_map(name: Literal["mysql"]) -> type[MysqlMap]: ...
+@overload
+def get_map(name: Literal["mariadb"]) -> type[MariadbMap]: ...
+@overload
+def get_map(name: Literal["postgresql"]) -> type[PostgresqlMap]: ...
+@overload
+def get_map(name: Literal["oracle"]) -> type[OracleMap]: ...
+@overload
+def get_map(name: Literal["sqlite"]) -> type[SqliteMap]: ...
+@overload
+def get_map(name: str) -> type[DialectMap[Any]]: ...
+def get_map(name: str) -> type[DialectMap[Any]]:
+    """Return the map registered under a dialect's name.
+
+    Overloaded per name, so a literal keeps the dialect's SQL type names:
+    ``get_map("mssql")`` is a ``type[MssqlMap]``.
+
+    Raises:
+        ValueError: If no dialect is registered under ``name``.
     """
     try:
-        return _REGISTRY[dialect].sa_dialect(paramstyle="named")
+        return _REGISTRY[name]
     except KeyError:
-        raise ValueError(f"Dialect not mapped on dialect_map: {dialect}") from None
-
-
-def get_type(dialect: DialectTypes, sql_type: str) -> PyTypeParameters:
-    """Map a raw SQL type name to its Python type name for ``dialect``."""
-    return get_map(dialect).get_py_type(sql_type)
-
-
-def render_type(dialect: DialectTypes, column: ColumnLike) -> str:
-    """Render the fully-parameterised SQL type for ``column`` under ``dialect``."""
-    return get_map(dialect).render_type(column)
-
-
-def render_reference(dialect: DialectTypes, schema_name: str, object_name: str) -> str:
-    """Render the fully-qualified, dialect-quoted reference for an object."""
-    return get_map(dialect).render_reference(schema_name, object_name)
-
-
-def get_str_length(dialect: DialectTypes, column: ColumnLike) -> int | None:
-    """Return the max character length for a bounded string ``column``, else ``None``."""
-    return get_map(dialect).str_length(column)
-
+        raise ValueError(f"Dialect not mapped on dialect_map: {name}") from None

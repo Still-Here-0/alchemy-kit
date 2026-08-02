@@ -15,7 +15,7 @@ from alchemy_kit.model import SchemaConfig
 from alchemy_kit.model._model.db_model import DBModel
 from alchemy_kit.model._model.object_model import ObjectModel
 from alchemy_kit.model._model.schema_model import SchemaModel
-from alchemy_kit.types.dialect_types import DialectTypes
+from alchemy_kit.resources.dialect_map import DialectMap, MssqlMap
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -59,7 +59,7 @@ def _object(name: str, columns: list[ColumnModel]) -> ObjectModel:
     return obj
 
 def _fake_model() -> DBModel:
-    model = DBModel("testdb", DialectTypes.MSSQL)
+    model = DBModel("testdb", MssqlMap)
 
     dbo = SchemaModel("dbo")
     dbo.objects["users"] = _object("users", [_column("id", "int"), _column("email", "varchar", nullable=True)])
@@ -134,7 +134,7 @@ def test_build_generates_package(monkeypatch: pytest.MonkeyPatch):
         compile(path.read_text(), str(path), "exec")
 
 def _optional_model() -> DBModel:
-    model = DBModel("testdb", DialectTypes.MSSQL)
+    model = DBModel("testdb", MssqlMap)
     dbo = SchemaModel("dbo")
     dbo.objects["products"] = _object("products", [
         _column("gen_id", "int", identity=True),
@@ -167,7 +167,7 @@ def test_optional_reflects_db_supplied_columns_not_nullability(monkeypatch: pyte
         assert f"    {column}: Series[" in pyi
 
 def _primary_key_model() -> DBModel:
-    model = DBModel("testdb", DialectTypes.MSSQL)
+    model = DBModel("testdb", MssqlMap)
 
     dbo = SchemaModel("dbo")
     dbo.objects["people"] = _object("people", [
@@ -205,7 +205,7 @@ def test_composite_primary_key_columns_are_not_individually_unique(monkeypatch: 
     assert "'profile_fk'" in unique_line and "'group_fk'" in unique_line
 
 def _grouped_model() -> DBModel:
-    model = DBModel("testdb", DialectTypes.MSSQL)
+    model = DBModel("testdb", MssqlMap)
 
     dbo = SchemaModel("dbo")
     dbo.objects["users"] = _object("users", [_column("id", "int")])

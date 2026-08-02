@@ -10,7 +10,7 @@ from alchemy_kit.connect.info_builder import (
     from_json,
     from_values_mssql,
 )
-from alchemy_kit.dialects import MssqlMap, SqliteMap
+from alchemy_kit.resources.dialects import MssqlMap, SqliteMap
 from alchemy_kit.types.auth_types import AuthType
 from alchemy_kit.types._driver_types import SqlServerNative, SqlServerODBC
 
@@ -72,7 +72,7 @@ def test_manager():
 
     with EngineManager(None) as manager:
         handler = manager.create_handler(info)
-        assert handler._con_info.unique_id == "a"
+        assert handler.get_connection_info().unique_id == "a"
 
 
 
@@ -93,9 +93,9 @@ def test_engine_kwargs_are_empty_for_drivers_that_batch_natively():
 def test_expected_dialect_is_accepted():
     info = ConnectionInfo(sqlalchemy.make_url("sqlite://"), expect=SqliteMap)
 
-    assert from_env(DIR / "dotenv_test", expect=MssqlMap).dialect is MssqlMap.dialect
+    assert from_env(DIR / "dotenv_test", expect=MssqlMap).dialect is MssqlMap
     assert from_json(DIR / "test_json.json", expect=MssqlMap)
-    assert info.dialect is SqliteMap.dialect
+    assert info.dialect is SqliteMap
 
 
 def test_unexpected_dialect_is_rejected():
@@ -115,7 +115,7 @@ def test_pooled_handler_is_rejected_for_another_dialect():
     with EngineManager(None) as manager:
         manager.create_handler(info)
 
-        assert manager.get_handler("b", SqliteMap)._con_info.dialect is SqliteMap.dialect
+        assert manager.get_handler("b", SqliteMap).get_connection_info().dialect is SqliteMap
         with pytest.raises(ValueError):
             manager.get_handler("b", MssqlMap)
 

@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
-from ...resources.dialect_map import render_reference
-from ...types import DialectTypes
+from ...resources.dialect_map import DialectMap
 from .._model.procedure_model import ProcedureModel
 from ..callable_model import CallableModel
 
@@ -17,7 +16,7 @@ class CallablePyFileBuilder:
     class_name: str
     file_path: Path
     procedure_model: ProcedureModel
-    db_dialect: DialectTypes
+    db_dialect: type[DialectMap[Any]]
 
     def build(self) -> str:
         file_data = self.template.read_text("UTF-8").format(
@@ -44,7 +43,7 @@ class CallablePyFileBuilder:
             f"db_name={self.db_name!r}",
             f"schema_name={self.schema_name!r}",
             f"name={self.procedure_model.name!r}",
-            f"reference_name={render_reference(self.db_dialect, self.schema_name, self.procedure_model.name)!r}",
+            f"reference_name={self.db_dialect.render_reference(self.schema_name, self.procedure_model.name)!r}",
             f"description={self.procedure_model.description!r}",
             f"parameters={parameters!r}",
         ]

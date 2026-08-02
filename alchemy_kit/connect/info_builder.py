@@ -6,14 +6,30 @@ import sqlalchemy
 from dotenv import dotenv_values
 from pydantic import SecretStr
 
-from ..resources.dialect_map import DialectMap, MssqlMap
+from ..resources.dialect_map import (
+    DialectLike,
+    DialectMap,
+    MariadbMap,
+    MssqlMap,
+    MysqlMap,
+    OracleMap,
+    PostgresqlMap,
+    SqliteMap,
+    get_map,
+)
 from ..resources._settings import Settings
 from ..types import _driver_types
 from ..types.api_types import SqlServerApi
 from ..types.auth_types import AuthType
-from ..types.dialect_types import DialectTypes
 from ..types.generic_path import GenericPath
-from ..types.sql_type_parameters import MssqlTypeParameters
+from ..types.sql_type_parameters import (
+    MariadbTypeParameters,
+    MssqlTypeParameters,
+    MysqlTypeParameters,
+    OracleTypeParameters,
+    PostgresqlTypeParameters,
+    SqliteTypeParameters,
+)
 from ._conn_builders import mssql
 from ._drivers import require_driver
 from ._info import ConnectionInfo
@@ -29,12 +45,68 @@ __all__ = [
     "from_values_oracle",
 ]
 
+@overload
+def from_json(
+    json_path: GenericPath,
+    unique_id: str | None = None,
+    *,
+    expect: Literal["mssql"] | type[MssqlMap],
+) -> ConnectionInfo[MssqlTypeParameters]: ...
+@overload
+def from_json(
+    json_path: GenericPath,
+    unique_id: str | None = None,
+    *,
+    expect: Literal["mysql"] | type[MysqlMap],
+) -> ConnectionInfo[MysqlTypeParameters]: ...
+@overload
+def from_json(
+    json_path: GenericPath,
+    unique_id: str | None = None,
+    *,
+    expect: Literal["mariadb"] | type[MariadbMap],
+) -> ConnectionInfo[MariadbTypeParameters]: ...
+@overload
+def from_json(
+    json_path: GenericPath,
+    unique_id: str | None = None,
+    *,
+    expect: Literal["postgresql"] | type[PostgresqlMap],
+) -> ConnectionInfo[PostgresqlTypeParameters]: ...
+@overload
+def from_json(
+    json_path: GenericPath,
+    unique_id: str | None = None,
+    *,
+    expect: Literal["oracle"] | type[OracleMap],
+) -> ConnectionInfo[OracleTypeParameters]: ...
+@overload
+def from_json(
+    json_path: GenericPath,
+    unique_id: str | None = None,
+    *,
+    expect: Literal["sqlite"] | type[SqliteMap],
+) -> ConnectionInfo[SqliteTypeParameters]: ...
+@overload
 def from_json[_TypeParameters: str](
     json_path: GenericPath,
     unique_id: str | None = None,
     *,
-    expect: type[DialectMap[_TypeParameters]] | None = None,
-) -> ConnectionInfo[_TypeParameters]:
+    expect: type[DialectMap[_TypeParameters]],
+) -> ConnectionInfo[_TypeParameters]: ...
+@overload
+def from_json(
+    json_path: GenericPath,
+    unique_id: str | None = None,
+    *,
+    expect: None = None,
+) -> ConnectionInfo[Any]: ...
+def from_json(
+    json_path: GenericPath,
+    unique_id: str | None = None,
+    *,
+    expect: DialectLike | None = None,
+) -> ConnectionInfo[Any]:
     """Build one of the connections described by a JSON file.
 
     The JSON is a mapping of ``unique_id`` -> connection definition, where each
@@ -70,11 +142,11 @@ def from_json[_TypeParameters: str](
     unique_id = _resolve_unique_id(json_path, data, unique_id)
     conn_data = data[unique_id]
 
-    dialect = DialectTypes(conn_data[Settings.FileExtraction.dialect_marker])
+    dialect = get_map(conn_data[Settings.FileExtraction.dialect_marker])
     connection = _match_dialect(dialect, unique_id, conn_data)
     connection.expect_dialect(expect)
 
-    return cast("ConnectionInfo[_TypeParameters]", connection)
+    return connection
 
 def _resolve_unique_id(json_path: Path, data: dict[str, dict[str, str]], unique_id: str | None) -> str:
     """Resolve which entry of a connection file to build: the one named, or the
@@ -102,11 +174,59 @@ def _resolve_unique_id(json_path: Path, data: dict[str, dict[str, str]], unique_
 
     return unique_id
 
+@overload
+def from_env(
+    env_path: GenericPath,
+    *,
+    expect: Literal["mssql"] | type[MssqlMap],
+) -> ConnectionInfo[MssqlTypeParameters]: ...
+@overload
+def from_env(
+    env_path: GenericPath,
+    *,
+    expect: Literal["mysql"] | type[MysqlMap],
+) -> ConnectionInfo[MysqlTypeParameters]: ...
+@overload
+def from_env(
+    env_path: GenericPath,
+    *,
+    expect: Literal["mariadb"] | type[MariadbMap],
+) -> ConnectionInfo[MariadbTypeParameters]: ...
+@overload
+def from_env(
+    env_path: GenericPath,
+    *,
+    expect: Literal["postgresql"] | type[PostgresqlMap],
+) -> ConnectionInfo[PostgresqlTypeParameters]: ...
+@overload
+def from_env(
+    env_path: GenericPath,
+    *,
+    expect: Literal["oracle"] | type[OracleMap],
+) -> ConnectionInfo[OracleTypeParameters]: ...
+@overload
+def from_env(
+    env_path: GenericPath,
+    *,
+    expect: Literal["sqlite"] | type[SqliteMap],
+) -> ConnectionInfo[SqliteTypeParameters]: ...
+@overload
 def from_env[_TypeParameters: str](
     env_path: GenericPath,
     *,
-    expect: type[DialectMap[_TypeParameters]] | None = None,
-) -> ConnectionInfo[_TypeParameters]:
+    expect: type[DialectMap[_TypeParameters]],
+) -> ConnectionInfo[_TypeParameters]: ...
+@overload
+def from_env(
+    env_path: GenericPath,
+    *,
+    expect: None = None,
+) -> ConnectionInfo[Any]: ...
+def from_env(
+    env_path: GenericPath,
+    *,
+    expect: DialectLike | None = None,
+) -> ConnectionInfo[Any]:
     """Build a single connection from a ``.env`` file.
 
     The file is read as a flat set of key/value pairs using the keys named in
@@ -130,12 +250,12 @@ def from_env[_TypeParameters: str](
         raise ValueError(f".env file not found: '{env_path}'")
 
     env_data = cast(dict[str, str], dotenv_values(env_path))
-    dialect = DialectTypes(env_data[Settings.FileExtraction.dialect_marker])
+    dialect = get_map(env_data[Settings.FileExtraction.dialect_marker])
 
     connection = _match_dialect(dialect, env_data.get(Settings.FileExtraction.unique_id_marker), env_data)
     connection.expect_dialect(expect)
 
-    return cast("ConnectionInfo[_TypeParameters]", connection)
+    return connection
 
 _TRUE_VALUES = {"yes", "true", "1", "on"}
 _FALSE_VALUES = {"no", "false", "0", "off"}
@@ -151,7 +271,7 @@ def _parse_optional_bool(value: Optional[str]) -> Optional[bool]:
         return False
     raise ValueError(f"Expected a boolean-like value, got {value!r}")
 
-def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: dict[str, str]) -> ConnectionInfo[Any]: # CONTINUE
+def _match_dialect(dialect: type[DialectMap[Any]], unique_id: Optional[str], conn_data: dict[str, str]) -> ConnectionInfo[Any]: # CONTINUE
     """Dispatch a parsed connection definition to the right dialect builder.
 
     Reads the auth method (and, per dialect, the remaining keys named in
@@ -172,8 +292,8 @@ def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: d
     """
     auth = AuthType(conn_data[Settings.FileExtraction.auth_marker])
     
-    match dialect:
-        case DialectTypes.MSSQL:
+    match dialect.name:
+        case "mssql":
             driver = _driver_types.parse_sql_server_driver(conn_data[Settings.FileExtraction.driver_marker])
             api = SqlServerApi(conn_data.get(Settings.FileExtraction.api_marker, SqlServerApi.PYODBC))
             encrypt = _parse_optional_bool(conn_data.get(Settings.FileExtraction.encrypt_marker))
@@ -208,19 +328,19 @@ def _match_dialect(dialect: DialectTypes, unique_id: Optional[str], conn_data: d
             else:
                 raise ValueError(f"'{auth}' is not a supported authentication method")
 
-        case DialectTypes.MYSQL:
+        case "mysql":
             return from_values_mysql()
 
-        case DialectTypes.POSTGRESQL:
+        case "postgresql":
             return from_values_postgresql()
 
-        case DialectTypes.MARIADB:
+        case "mariadb":
             return from_values_mariadb()
 
-        case DialectTypes.SQLITE:
+        case "sqlite":
             return from_values_sqlite()
 
-        case DialectTypes.ORACLE:
+        case "oracle":
             return from_values_oracle()
 
 @overload

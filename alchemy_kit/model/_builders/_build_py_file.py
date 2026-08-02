@@ -3,8 +3,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from ...resources._identifiers import Identifiers
-from ...resources.dialect_map import get_str_length, get_type, render_reference
-from ...types import DialectTypes
+from ...resources.dialect_map import DialectMap
 from ...types.model_metadata import ForeignKeyMeta
 from .._model.column_model import ColumnModel
 from .._model.constraint_model import CheckConstraintModel, FilteredUniqueIndexModel
@@ -26,7 +25,7 @@ class PyFileBuilder:
     class_name: str
     file_path: Path
     object_model: ObjectModel
-    db_dialect: DialectTypes
+    db_dialect: type[DialectMap[Any]]
 
     def __post_init__(self) -> None:
         self.column_names = {
@@ -77,7 +76,7 @@ class PyFileBuilder:
         if column_model.is_optional:
             column_type += "Optional["
 
-        py_type = get_type(self.db_dialect, column_model.type)
+        py_type = self.db_dialect.get_py_type(column_model.type)
 
         column_type += f"Series[{py_type}"
         column_type += ']'*column_type.count('[')
@@ -93,7 +92,7 @@ class PyFileBuilder:
         if column_model.is_unique:
             parameters.append("unique=True")
 
-        str_length = get_str_length(self.db_dialect, column_model)
+        str_length = self.db_dialect.str_length(column_model)
         if str_length is not None:
             parameters.append(f"str_length={{'max_value': {str_length}}}")
 
@@ -237,7 +236,7 @@ class PyFileBuilder:
         metadata.append(f"schema_name={self.schema_name!r}")
         metadata.append(f"obj_name={self.object_model.name!r}")
         metadata.append(f"obj_type={self.object_model.type!r}")
-        metadata.append(f"reference_name={render_reference(self.db_dialect, self.schema_name, self.object_model.name)!r}")
+        metadata.append(f"reference_name={self.db_dialect.render_reference(self.schema_name, self.object_model.name)!r}")
         metadata.append(f"description={self.object_model.description!r}")
 
         if unparsed_checks:

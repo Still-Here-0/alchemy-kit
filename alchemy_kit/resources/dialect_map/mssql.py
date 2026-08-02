@@ -1,6 +1,5 @@
 from typing import cast, get_args
 
-from alchemy_kit.types.dialect_types import DialectTypes
 
 from sqlalchemy.dialects import mssql as sa_mssql
 
@@ -115,7 +114,8 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
     py_types = cast(dict[str, PyTypeParameters], _PY_TYPES)
     sa_types = cast(dict[str, SaTypeFactory], _SA_TYPES)
     _reflected_synonyms = cast(dict[str, str], _REFLECTED_SYNONYMS)
-    dialect = DialectTypes.MSSQL
+    name = "mssql"
+    _sa_dialect_factory = sa_mssql.dialect
     dialect_paramaters = frozenset(get_args(MssqlTypeParameters))
     _quote_open = "["
     _quote_close = "]"

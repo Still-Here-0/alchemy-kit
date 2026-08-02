@@ -5,7 +5,7 @@ Passing a map to ``ConnectionInfo``, ``from_env``, ``from_json`` or
 every unit built from it a checked ``cast``.
 """
 
-from .resources.dialect_map import (
+from .dialect_map import (
     MariadbMap,
     MssqlMap,
     MysqlMap,
@@ -13,10 +13,8 @@ from .resources.dialect_map import (
     PostgresqlMap,
     SqliteMap,
 )
-from .types.dialect_types import DialectTypes
 
 __all__ = [
-    "DialectTypes",
     "MariadbMap",
     "MssqlMap",
     "MysqlMap",

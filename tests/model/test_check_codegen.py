@@ -8,7 +8,7 @@ from alchemy_kit.model._builders._build_py_file import PyFileBuilder
 from alchemy_kit.model._model.column_model import ColumnModel
 from alchemy_kit.model._model.constraint_model import CheckConstraintModel, FilteredUniqueIndexModel
 from alchemy_kit.model._model.object_model import ObjectModel
-from alchemy_kit.types.dialect_types import DialectTypes
+from alchemy_kit.resources.dialect_map import DialectMap, MssqlMap
 from alchemy_kit.types.errors import ModelValidationError
 
 
@@ -69,7 +69,7 @@ def _build(orders_model: ObjectModel, tmp_path: Path) -> str:
         class_name="orders",
         file_path=tmp_path / "orders_MODULE.py",
         object_model=orders_model,
-        db_dialect=DialectTypes.MSSQL,
+        db_dialect=MssqlMap,
     )
     return builder.build()
 
@@ -137,7 +137,7 @@ def test_no_checks_generates_clean_file(tmp_path: Path):
         class_name="plain",
         file_path=tmp_path / "plain_MODULE.py",
         object_model=obj,
-        db_dialect=DialectTypes.MSSQL,
+        db_dialect=MssqlMap,
     )
     file_data = builder.build()
 

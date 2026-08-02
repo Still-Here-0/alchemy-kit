@@ -112,7 +112,7 @@ too, so `cast` is checked against that database's own types:
 
 ```python
 from alchemy_kit.connect import info_builder
-from alchemy_kit.dialects import MssqlMap
+from alchemy_kit.resources.dialects import MssqlMap
 
 conn = info_builder.from_env(".env", expect=MssqlMap)  # raises if the URL is not MSSQL
 
@@ -123,15 +123,14 @@ with EngineManager(None) as manager:
     table.price.cast("decimal")                 # checked; "clob" would not compile
 ```
 
-`alchemy_kit.dialects` holds one map per database — `MssqlMap`,
-`PostgresqlMap`, `MysqlMap`, `MariadbMap`, `OracleMap`, `SqliteMap`. Passing
-one is optional: leave it out and everything still runs, you just lose the
-`cast` checking. The same argument works on `ConnectionInfo`, `from_json` and
+`alchemy_kit.resources.dialects` holds one map per database — `MssqlMap`,
+`PostgresqlMap`, `MysqlMap`, `MariadbMap`, `OracleMap`, `SqliteMap`. Passing one
+is optional: leave it out and everything still runs, you just lose the `cast`
+checking. The same argument works on `ConnectionInfo`, `from_json` and
 `EngineManager.get_handler`.
 
 `from_json` builds one named connection at a time, so a file describing several
-databases gives each of them its own map — and only the entry you name is
-built:
+databases gives each of them its own map — and only the entry you name is built:
 
 ```python
 prod  = info_builder.from_json("connections.json", "prod",  expect=MssqlMap)

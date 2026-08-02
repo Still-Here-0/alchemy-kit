@@ -8,7 +8,6 @@ from sqlalchemy.sql.expression import ClauseElement, Insert
 from ..model.units import ColumnUnit, ObjectUnit
 from ..resources._pandas import none_if_na
 from ..resources._sql import SQL
-from ..resources.dialect_map import get_map
 from ..types.sql_types import SqlScalarType
 from ._base import SqlBuilder
 from ._select import SelectBuilder
@@ -228,7 +227,7 @@ class InsertBuilder(SqlBuilder):
 
         if not self._sa_dialect().supports_multivalues_insert:
             raise ValueError(
-                f"{self._handler._con_info.dialect} cannot carry several rows in"
+                f"{self._handler.get_connection_info().dialect} cannot carry several rows in"
                 " one VALUES clause; use to_sql, which binds every row to a"
                 " single statement instead"
             )
@@ -246,7 +245,7 @@ class InsertBuilder(SqlBuilder):
         if chunk_size is not None and chunk_size < 1:
             raise ValueError(f"chunk_size must be at least 1, got {chunk_size}")
 
-        limits = get_map(self._handler._con_info.dialect).limits
+        limits = self._handler.get_connection_info().dialect.limits
         caps = [cap for cap in (chunk_size, limits.max_values_rows) if cap is not None]
 
         if columns := len(rows[0]):
