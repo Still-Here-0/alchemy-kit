@@ -341,6 +341,50 @@ def test_operand_niladic_dialect_matrix():
             rendered(ou._SessionUser(), d)
 
 
+def test_apply_places_the_expression_where_self_marks(handler: EngineHandler):
+    tmp = TempBuilder(handler.get_unit(items))
+    tmp.run()
+    t = tmp.unit()
+    InsertBuilder(t).from_values((t.id_1, 1), (t.name, "bol"), (t.price, 1.0)).run()
+
+    _, df = SelectBuilder(
+        t.name.apply("instr", "o").set_alias("trailing"),
+        t.name.apply("instr", "bolt", "SELF").set_alias("leading"),
+        from_=t,
+    ).run()
+
+    assert df["trailing"].tolist() == [2]
+    assert df["leading"].tolist() == [1]
+
+
+def test_operand_literal_starts_an_expression_from_a_value(handler: EngineHandler):
+    tmp = TempBuilder(handler.get_unit(items))
+    tmp.run()
+    t = tmp.unit()
+    InsertBuilder(t).from_values((t.id_1, 1), (t.name, "bolt"), (t.price, 2.0)).run()
+
+    builder = SelectBuilder(
+        (OperandUnit.literal(10.0) - t.price).set_alias("change"),
+        OperandUnit.literal("n/a").upper().set_alias("shout"),
+        from_=t,
+    )
+
+    assert builder.to_sql().query_parameters == {"param_1": 10.0, "param_2": "n/a"}
+
+    _, df = builder.run()
+    assert df["change"].tolist() == [8.0]
+    assert df["shout"].tolist() == ["N/A"]
+
+
+def test_apply_renders_a_raw_keyword_argument_unquoted():
+    i = MSSQL_HANDLER.get_unit(mssql_items)
+    added = i.id_1.apply("dateadd", OperandUnit.raw("day"), 7, "SELF").set_alias("due")
+    builder = SelectBuilder(added, from_=i)
+
+    assert "dateadd(day, :dateadd_1, dbo.items.id)" in builder.render()
+    assert builder.to_sql().query_parameters == {"dateadd_1": 7}
+
+
 def test_window_lag(handler: EngineHandler):
     tmp = TempBuilder(handler.get_unit(items))
     tmp.run()

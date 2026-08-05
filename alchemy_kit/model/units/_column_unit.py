@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 import sqlalchemy as sa
 from sqlalchemy.sql.expression import ColumnElement
@@ -14,6 +14,9 @@ if TYPE_CHECKING:
 type _Operand = ColumnUnit[Any] | SqlScalarType
 type _Condition = BooleanColumnUnit[Any] | bool
 type _Sortable = ColumnUnit[Any] | OrderingColumnUnit[Any]
+type _AppliedOperand = _Operand | Literal["SELF"]
+
+_SELF: Final = "SELF"
 
 
 class _ExpressionUnit[_TypeParameters: str]:
@@ -191,16 +194,23 @@ class ColumnUnit[_TypeParameters: str](_ExpressionUnit[_TypeParameters]):
             element = element.concat(self._value_operand(other))
         return self._unit(element)
 
-    def apply(self, function: str, *args: _Operand) -> "ColumnUnit[_TypeParameters]":
+    def apply(self, function: str, *args: _AppliedOperand) -> "ColumnUnit[_TypeParameters]":
         """Return a new unit applying an arbitrary SQL function to this
-        expression, e.g. ``apply("upper")`` or ``apply("power", 2)``. The
-        function name is rendered as-is; extra arguments may be value units or
-        plain Python values, which are bound as parameters by Core."""
-        return self._unit(
-            getattr(sa.func, function)(
-                self._element, *(self._value_operand(a) for a in args)
-            )
-        )
+        expression, e.g. ``apply("upper")`` or ``apply("power", 2)``. This
+        expression leads the arguments unless ``"SELF"`` marks its place among
+        them, as in ``apply("dateadd", OperandUnit.raw("day"), 7, "SELF")``.
+
+        The function name is rendered as-is; the other arguments may be value
+        units or plain Python values, which are bound as parameters by Core —
+        the string ``"SELF"`` among them is the marker, never a bound value."""
+        marks = [isinstance(a, str) and a == _SELF for a in args]
+        operands = [
+            self._element if mark else self._value_operand(a)
+            for a, mark in zip(args, marks)
+        ]
+        if not any(marks):
+            operands.insert(0, self._element)
+        return self._unit(getattr(sa.func, function)(*operands))
 
     def lag(self, offset: int = 1, default: _Operand = None) -> "WindowFunctionUnit[_TypeParameters]":
         """Return a window function rendering ``LAG(<this>, offset)`` — this

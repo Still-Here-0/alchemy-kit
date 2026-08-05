@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.sql import sqltypes
 
 from ...resources._compiler import new_sql_type
+from ...types.sql_types import SqlScalarType
 from ._column_unit import AggregateColumnUnit, ColumnUnit, WindowFunctionUnit
 from ...resources.dialect_map import MariadbMap, MssqlMap, MysqlMap, OracleMap, SqliteMap
 
@@ -100,3 +101,16 @@ class OperandUnit:
         """Return ``SESSION_USER`` — the session user. Unsupported: SQLite,
         Oracle."""
         return ColumnUnit[Any](_SessionUser())
+
+    @staticmethod
+    def raw(token: str) -> ColumnUnit[Any]:
+        """Return ``token`` rendered into the SQL verbatim, for the keywords a
+        function takes unquoted, like the ``day`` of ``DATEADD(day, 7, col)``.
+        The token is never escaped, so keep user input out of it."""
+        return ColumnUnit[Any](sa.literal_column(token))
+
+    @staticmethod
+    def literal(value: SqlScalarType) -> ColumnUnit[Any]:
+        """Return ``value`` as a value expression bound as a parameter, the way
+        to start an expression from a Python value instead of a column."""
+        return ColumnUnit[Any](sa.literal(value))

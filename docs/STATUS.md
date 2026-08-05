@@ -3,7 +3,7 @@
 What alchemy-kit implements today and what remains. Checked items are done;
 unchecked items are planned.
 
-Last updated: 2026-07-30
+Last updated: 2026-08-05
 
 The user drives DQL, DML and DDL through builders. The library owns TCL
 internally (it manages transaction boundaries). DCL will not be implemented.
@@ -61,7 +61,6 @@ what this step recorded.
   - [x] Alias an object and carry the alias into every column reference
   - [x] Expose the table metadata recorded on the model
 - [x] Value expressions (ColumnUnit)
-  - [x] Name an expression's output column
   - [x] Cast to a SQL type of the connection's dialect
   - [x] Implement the arithmetic and comparison operators
   - [x] Implement the aggregates (SUM / AVG / MIN / MAX / COUNT)
@@ -74,6 +73,12 @@ what this step recorded.
     - The most dialect-divergent area; each spells these differently
   - [x] Apply an arbitrary SQL function by name
     - The escape hatch for anything without a dedicated method
+    - [x] Place arguments before the expression, not only after it
+      - This expression leads the arguments unless the string `"SELF"` marks
+        its place among them, which is what the calls taking it later need —
+        `apply("power", 2, "SELF")`,
+        `apply("dateadd", OperandUnit.raw("day"), 7, "SELF")`,
+        `apply("concat_ws", "-", "SELF")`
 - [x] Predicates (BooleanColumnUnit)
   - [x] Combine conditions with AND / OR / NOT
   - [x] Implement IS NULL and IS NOT NULL
@@ -104,6 +109,13 @@ what this step recorded.
         CURRENT_TIMESTAMP / CURRENT_USER / SESSION_USER)
     - Each raises when compiled for a dialect that lacks it, rather than
       rendering SQL the server will reject
+  - [x] Render a raw SQL token as a value expression
+    - The keywords a function takes unquoted, like the `day` of
+      `DATEADD(day, 7, col)`; bound parameters cannot carry them
+  - [x] Implement a plain Python literal into a value expression
+    - Turns a literal into a `ColumnUnit`, so an expression can start from a
+      value instead of a column and reach the unit methods; the value is bound
+      as a parameter, unlike the raw token above
 
 ## DQL — Data Query Language
 
@@ -181,9 +193,10 @@ Notes on returning:
 
 3. MariaDB compiles correctly as it is; no `@compiles` override is needed. Its
    flag is misleading rather than accurate: the dialect `DialectMap.sa_dialect`
-   builds has never connected, and MariaDB only learns its own version — and sets the
-   flag from it — during `initialize()` on first connect. Real support is INSERT
-   from 10.5 and DELETE from 10.0.5; `UPDATE ... RETURNING` does not exist.
+   builds has never connected, and MariaDB only learns its own version — and
+   sets the flag from it — during `initialize()` on first connect. Real support
+   is INSERT from 10.5 and DELETE from 10.0.5; `UPDATE ... RETURNING` does not
+   exist.
 4. Oracle returns nothing to fetch. `RETURNING id INTO :ret_0` hands the values
    back through bind variables the caller allocates, one entry per affected row:
 
