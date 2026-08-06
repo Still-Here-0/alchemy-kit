@@ -380,3 +380,56 @@ def test_run_without_a_chunk_size_does_not_warn(handler: EngineHandler):
 
     assert count == 1
     assert not [w for w in recorded if issubclass(w.category, DeprecationWarning)]
+
+
+def test_insert_returning_hands_back_the_inserted_row(handler: EngineHandler):
+    tmp = TempBuilder(handler.get_unit(items))
+    tmp.run()
+    t = tmp.unit()
+
+    count, data = (
+        InsertBuilder(t)
+        .from_values((t.id_1, 1), (t.name, "bolt"), (t.price, 0.5))
+        .returning()
+        .run()
+    )
+
+    assert count == 1
+    assert data.to_dict(orient="records") == [{"id": 1, "name": "bolt", "price": 0.5}]
+
+
+def test_insert_returning_a_dataframe_folds_the_rows_into_values(handler: EngineHandler):
+    tmp = TempBuilder(handler.get_unit(items))
+    tmp.run()
+    t = tmp.unit()
+    insert = InsertBuilder(t).from_dataframe(
+        pd.DataFrame({"id_1": [1, 2, 3], "name": ["bolt", "nut", "gear"], "price": [0.5, 1.5, 2.5]})
+    ).returning(t.id_1, t.name)
+
+    assert "VALUES (:id_m0" in insert.render()
+
+    count, data = insert.run(chunk_size=2)
+
+    assert count == 3
+    assert data["name"].tolist() == ["bolt", "nut", "gear"]
+
+
+def test_insert_returning_rejects_the_record_bound_statement():
+    i = MSSQL_HANDLER.get_unit(mssql_items)
+    insert = InsertBuilder(i).from_dataframe(pd.DataFrame({"id_1": [1, 2]})).returning()
+
+    with pytest.raises(ValueError, match="cannot bind one record per execution"):
+        insert.to_sql()
+
+
+def test_insert_returning_renders_mssql_output_inserted():
+    i = MSSQL_HANDLER.get_unit(mssql_items)
+
+    assert "OUTPUT inserted.id" in InsertBuilder(i).from_values((i.id_1, 1)).returning().render()
+
+
+def test_insert_returning_raises_where_the_dialect_cannot():
+    i = ORACLE_HANDLER.get_unit(oracle_items)
+
+    with pytest.raises(ValueError, match="cannot return the rows INSERT affects"):
+        InsertBuilder(i).from_values((i.id_1, 1)).returning()

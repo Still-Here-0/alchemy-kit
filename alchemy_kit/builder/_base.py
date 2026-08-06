@@ -1,18 +1,20 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import pandas as pd
+import sqlalchemy as sa
 from sqlalchemy import Compiled
 from sqlalchemy.engine import Dialect
-from sqlalchemy.sql.expression import ClauseElement
+from sqlalchemy.sql.expression import ClauseElement, ColumnElement
 
 from ..connect._engine_handler import EngineHandler
 from ..model.base_model import BaseModel
-from ..model.units._column_unit import _ExpressionUnit
+from ..model.units._column_unit import ColumnUnit, _ExpressionUnit
 from ..model.units._object_unit import ObjectUnit
 from ..resources._sql import SQL
 from ..types.errors import StatementLimitError
+from ..types.returning_support import ReturningStatement
 
 
 class SqlBuilder(ABC):
@@ -33,6 +35,37 @@ class SqlBuilder(ABC):
     @abstractmethod
     def _statement(self) -> ClauseElement:
         """Return the Core statement this builder currently describes."""
+
+    def _returned_columns(
+        self,
+        statement: ReturningStatement,
+        table: sa.Table,
+        columns: Sequence[ColumnUnit[Any]],
+    ) -> list[ColumnElement[Any]]:
+        """Return the columns a returning clause should carry — every column of
+        ``table`` when none are named — once the dialect can read them back."""
+        dialect = self._handler.get_connection_info().dialect
+
+        if not dialect.returning.allows(statement):
+            raise ValueError(
+                f"{dialect.name} cannot return the rows {statement} affects;"
+                " read them back with a separate SELECT"
+            )
+
+        self._check_units(*columns)
+
+        if not columns:
+            return list(table.columns)
+        return [column._element for column in columns]
+
+    def _returning_clause(self) -> tuple[ColumnElement[Any], ...]:
+        """Return the columns the statement's returning clause carries, empty
+        when it has none."""
+        return getattr(self._statement(), "_returning", ())
+
+    def _returns_rows(self) -> bool:
+        """Whether the statement carries a returning clause."""
+        return bool(self._returning_clause())
 
     def _sa_dialect(self) -> Dialect:
         return self._handler.get_connection_info().dialect.sa_dialect()

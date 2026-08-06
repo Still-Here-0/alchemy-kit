@@ -60,3 +60,13 @@ class UpdateBuilder(SqlBuilder):
         """Restrict the updated rows (multiple conditions are ``AND``-ed)."""
         self._check_units(*conditions)
         return self._with(self._stmt.where(*(c._element for c in conditions)))
+
+    def returning(self, *columns: ColumnUnit[Any]) -> "UpdateBuilder":
+        """Return the updated rows in the ``run`` DataFrame, as ``RETURNING``
+        or MSSQL's ``OUTPUT inserted.*``; every column of the target when none
+        are named. The values are the new ones, and a dialect that cannot hand
+        them back raises — MariaDB among them, which returns rows from an
+        INSERT and a DELETE but not from an UPDATE."""
+        return self._with(
+            self._stmt.returning(*self._returned_columns("UPDATE", self._table, columns))
+        )

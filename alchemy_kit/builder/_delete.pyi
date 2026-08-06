@@ -2,7 +2,7 @@ from typing import Any
 
 from sqlalchemy.sql.expression import Delete
 
-from ..model.units import BooleanColumnUnit, ObjectUnit
+from ..model.units import BooleanColumnUnit, ColumnUnit, ObjectUnit
 from ..types.typestate import Set, Unset
 from ._base import SqlBuilder
 
@@ -15,3 +15,4 @@ class DeleteBuilder[W](SqlBuilder):
         self: DeleteBuilder[Unset],
         *conditions: BooleanColumnUnit[Any],
     ) -> DeleteBuilder[Set]: ...
+    def returning(self, *columns: ColumnUnit[Any]) -> DeleteBuilder[W]: ...

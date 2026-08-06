@@ -127,6 +127,18 @@ class InsertBuilder(SqlBuilder):
 
         return self._with(self._stmt.from_select(names, stmt))
 
+    def returning(self, *columns: ColumnUnit[Any]) -> "InsertBuilder":
+        """Return the inserted rows in the ``run`` DataFrame, as ``RETURNING``
+        or MSSQL's ``OUTPUT inserted.*``; every column of the target when none
+        are named. Raises on a dialect that cannot hand them back.
+
+        A DataFrame insert then runs as the multi-row ``VALUES`` statements
+        :meth:`to_sqls` compiles, since a statement executed once per bound
+        record leaves the rows it returns unreachable."""
+        return self._with(
+            self._stmt.returning(*self._returned_columns("INSERT", self._table, columns))
+        )
+
     def to_sql(self, **parameters: Any) -> SQL:
         """Compile the insert into a single :class:`SQL`.
 
@@ -140,6 +152,13 @@ class InsertBuilder(SqlBuilder):
         if records is None:
             return super().to_sql(**parameters)
 
+        if records and self._returns_rows():
+            raise ValueError(
+                "a returning insert cannot bind one record per execution, which"
+                " leaves the returned rows unreachable; compile it with to_sqls,"
+                " or run it, which does that for you"
+            )
+
         return self._checked(SQL(
             raw_query=self._record_template(records),
             query_parameters=records,
@@ -147,11 +166,17 @@ class InsertBuilder(SqlBuilder):
 
     def render(self) -> str:
         """Return the one-row ``INSERT`` template ``to_sql`` binds the records
-        to, rather than the multi-row ``VALUES`` statement Core would compile."""
+        to, rather than the multi-row ``VALUES`` statement Core would compile.
+
+        A :meth:`returning` insert of a DataFrame renders its first chunked
+        statement instead, which is the form it runs as."""
         records = self._records({})
 
         if records is None:
             return super().render()
+
+        if records and self._returns_rows():
+            return cast("str", self.to_sqls()[0].raw_query)
         return self._record_template(records)
 
     def _rows(self) -> list[dict[str, Any]] | None:
@@ -254,7 +279,12 @@ class InsertBuilder(SqlBuilder):
         return max(1, min(caps, default=len(rows)))
 
     def _values_sql(self, chunk: Sequence[dict[str, Any]], parameters: dict[str, Any]) -> SQL:
-        compiled = sa.insert(self._table).values(list(chunk)).compile(
+        stmt = sa.insert(self._table).values(list(chunk))
+
+        if returned := self._returning_clause():
+            stmt = cast("Insert", stmt.returning(*returned))
+
+        compiled = stmt.compile(
             dialect=self._sa_dialect(),
             compile_kwargs={"render_postcompile": True},
         )
@@ -270,9 +300,11 @@ class InsertBuilder(SqlBuilder):
         Without ``chunk_size`` the insert runs as the one statement
         :meth:`to_sql` compiles, bound once per row; with it the rows are split
         into the multi-row statements :meth:`to_sqls` compiles, run in one
-        all-or-nothing transaction.
+        all-or-nothing transaction. A :meth:`returning` insert of a DataFrame
+        takes the chunked route whatever ``chunk_size`` says, and its rows come
+        back as one frame.
         """
-        if chunk_size is None:
+        if chunk_size is None and not (self._returns_rows() and self._rows()):
             return super().run(**parameters)
 
         sqls = self.to_sqls(chunk_size=chunk_size, **parameters)
@@ -280,8 +312,11 @@ class InsertBuilder(SqlBuilder):
         if len(sqls) == 1:
             return self._handler.run_sql(sqls[0])
 
-        counts = [count for count, _ in self._handler.run_sqls(sqls)]
+        results = self._handler.run_sqls(sqls)
+        counts = [count for count, _ in results]
 
         if any(count is None for count in counts):
             return None, pd.DataFrame()
-        return sum(cast("list[int]", counts)), pd.DataFrame()
+        return sum(cast("list[int]", counts)), pd.concat(
+            [data for _, data in results], ignore_index=True
+        )

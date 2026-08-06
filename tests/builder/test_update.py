@@ -3,7 +3,7 @@ import pytest
 from alchemy_kit.builder import InsertBuilder, SelectBuilder, TempBuilder, UpdateBuilder
 from alchemy_kit.connect._engine_handler import EngineHandler
 
-from _helpers import SQLITE_HANDLER, items
+from _helpers import MARIADB_HANDLER, SQLITE_HANDLER, items
 
 
 def test_update_render_and_parameters():
@@ -114,3 +114,33 @@ def test_update_without_where_rewrites_every_row(handler: EngineHandler):
 
     _, df = SelectBuilder(t.price, from_=t).run()
     assert df["price"].tolist() == [0.0, 0.0]
+
+
+def test_update_returning_hands_back_the_new_rows(handler: EngineHandler):
+    t = _staged_items(handler)
+
+    count, data = (
+        UpdateBuilder(t)
+        .set_values((t.price, t.price * 2))
+        .where(t.price > 1)
+        .returning(t.name, t.price)
+        .run()
+    )
+
+    assert count == 1
+    assert data.to_dict(orient="records") == [{"name": "nut", "price": 3.0}]
+
+
+def test_update_returning_defaults_to_every_column(handler: EngineHandler):
+    t = _staged_items(handler)
+
+    _, data = UpdateBuilder(t).set_values((t.price, 0.0)).where(t.id_1 == 1).returning().run()
+
+    assert data.columns.tolist() == ["id", "name", "price"]
+
+
+def test_update_returning_raises_where_the_dialect_cannot():
+    i = MARIADB_HANDLER.get_unit(items)
+
+    with pytest.raises(ValueError, match="cannot return the rows UPDATE affects"):
+        UpdateBuilder(i).set_values((i.price, 1.0)).returning()

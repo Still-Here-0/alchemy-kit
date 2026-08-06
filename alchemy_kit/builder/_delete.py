@@ -1,9 +1,9 @@
-from typing import Any
+from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.sql.expression import Delete
 
-from ..model.units import BooleanColumnUnit, ObjectUnit
+from ..model.units import BooleanColumnUnit, ColumnUnit, ObjectUnit
 from ._base import SqlBuilder
 from ._utils import plain_table
 
@@ -32,3 +32,10 @@ class DeleteBuilder(SqlBuilder):
         """Restrict the deleted rows (multiple conditions are ``AND``-ed)."""
         self._check_units(*conditions)
         return self._with(self._stmt.where(*(c._element for c in conditions)))
+
+    def returning(self, *columns: ColumnUnit[Any]) -> "DeleteBuilder":
+        """Return the deleted rows in the ``run`` DataFrame, as ``RETURNING``
+        or MSSQL's ``OUTPUT deleted.*``; every column of the target when none
+        are named. Raises on a dialect that cannot hand them back."""
+        returning = self._stmt.returning(*self._returned_columns("DELETE", self._table, columns))
+        return self._with(cast("Delete", returning))

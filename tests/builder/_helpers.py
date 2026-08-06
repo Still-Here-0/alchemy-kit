@@ -7,7 +7,7 @@ from pandera.typing import Series
 from alchemy_kit.connect._engine_handler import EngineHandler
 from alchemy_kit.connect._info import ConnectionInfo
 from alchemy_kit.model.base_model import BaseModel, MetaData
-from alchemy_kit.resources.dialects import MssqlMap, OracleMap, SqliteMap
+from alchemy_kit.resources.dialects import MariadbMap, MssqlMap, OracleMap, SqliteMap
 
 
 class items(BaseModel):
@@ -69,3 +69,4 @@ class oracle_items(BaseModel):
 SQLITE_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("sqlite://"), expect=SqliteMap))
 MSSQL_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("mssql+pyodbc://"), expect=MssqlMap))
 ORACLE_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("oracle+oracledb://"), expect=OracleMap))
+MARIADB_HANDLER = EngineHandler(cast(Any, None), ConnectionInfo(sqlalchemy.make_url("mariadb+mariadbconnector://"), expect=MariadbMap))

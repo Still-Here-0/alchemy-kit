@@ -7,6 +7,7 @@ from sqlalchemy.engine import Dialect
 
 from ...types.dialect_types import DialectTypesInput
 from ...types.py_type_parameters import PyTypeParameters
+from ...types.returning_support import ReturningSupport
 from ...types.statement_limits import StatementLimits
 
 type SaTypeFactory = Callable[[], sa.types.TypeEngine[Any]]
@@ -68,6 +69,7 @@ class DialectMap[_TypeParameters: str](ABC):
     _quote_close: ClassVar[str] = '"'
 
     limits: ClassVar[StatementLimits]
+    returning: ClassVar[ReturningSupport]
 
     @classmethod
     def sa_dialect(cls) -> Dialect:

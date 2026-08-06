@@ -152,18 +152,19 @@ what this step recorded.
   - [x] Split a large insert into chunked statements
     - Each statement carries as many rows as the dialect's row cap and parameter
       budget allow
-  - [ ] Return the inserted rows
-    - Rendered as `RETURNING`, or `OUTPUT inserted.*` on MSSQL
+  - [x] Return the inserted rows
+    - `returning()` renders `RETURNING`, or `OUTPUT inserted.*` on MSSQL; a
+      DataFrame insert then runs as the chunked multi-row statements
 - [x] UPDATE (UpdateBuilder)
   - [x] Assign the new column values
   - [x] Restrict the updated rows with a WHERE clause
-  - [ ] Return the updated rows
-    - Rendered as `RETURNING`, or `OUTPUT inserted.*` on MSSQL
+  - [x] Return the updated rows
+    - `returning()` renders `RETURNING`, or `OUTPUT inserted.*` on MSSQL
   - [ ] Update against a joined source (`UPDATE ... FROM`)
 - [x] DELETE (DeleteBuilder)
   - [x] Restrict the deleted rows with a WHERE clause
-  - [ ] Return the deleted rows
-    - Rendered as `RETURNING`, or `OUTPUT deleted.*` on MSSQL
+  - [x] Return the deleted rows
+    - `returning()` renders `RETURNING`, or `OUTPUT deleted.*` on MSSQL
   - [ ] Delete against a joined source (`USING` / `DELETE ... FROM`)
 - [x] CALL / EXEC (CallableUnit)
   - [x] Render the dialect's `CALL` / `EXEC` statement
@@ -224,6 +225,22 @@ Notes on returning:
        INSERT INTO items (id, name)
        VALUES (:id_m0, :name_m0), (:id_m1, :name_m1), (:id_m2, :name_m2)
        {"id_m0": 1, "name_m0": ...}                        -- 1 execution
+
+Resolution: each of the three builders takes a `returning(*columns)` — every
+column of the target when none are named — and the rows arrive in the
+DataFrame `run` already returns, since `EngineHandler` collects whatever the
+result carries.
+
+Which dialects may ask is `DialectMap.returning`, a `ReturningSupport` per
+statement kind: all three on MSSQL, PostgreSQL and SQLite, INSERT and DELETE on
+MariaDB, none on MySQL and Oracle. `returning()` raises there rather than
+compiling a clause the server would reject, which covers notes 1 to 4; Oracle's
+OUT-variable route stays unimplemented.
+
+Note 5 is handled inside `InsertBuilder`: a returning DataFrame insert runs
+through `to_sqls` whatever `chunk_size` says, its chunks' frames concatenated
+into one, and `to_sql` raises instead of binding a record per execution.
+`render` shows the first chunked statement there, which is the form that runs.
 
 ## DDL — Data Definition Language
 

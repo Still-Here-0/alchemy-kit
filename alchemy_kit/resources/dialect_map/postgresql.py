@@ -7,6 +7,7 @@ from sqlalchemy.types import NullType
 from ._base import ColumnLike, DialectMap, ReflectedTypeFacts, SaTypeFactory
 from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import PostgresqlTypeParameters
+from ...types.returning_support import ReturningSupport
 from ...types.statement_limits import StatementLimits
 
 
@@ -217,6 +218,7 @@ class PostgresqlMap(DialectMap[PostgresqlTypeParameters]):
     _sa_dialect_factory = sa_pg.dialect
     dialect_paramaters = frozenset(get_args(PostgresqlTypeParameters))
     limits = StatementLimits(max_params=65535)
+    returning = ReturningSupport(insert=True, update=True, delete=True)
 
     @classmethod
     def reflected_type_facts(cls, sa_type: object) -> ReflectedTypeFacts:

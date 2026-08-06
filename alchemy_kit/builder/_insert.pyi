@@ -4,7 +4,7 @@ from typing import Any
 import pandas as pd
 from sqlalchemy.sql.expression import Insert
 
-from ..model.units import ObjectUnit
+from ..model.units import ColumnUnit, ObjectUnit
 from ..resources._sql import SQL
 from ..types.sql_types import SqlScalarType
 from ..types.typestate import Set, Unset
@@ -35,6 +35,7 @@ class InsertBuilder[F](SqlBuilder):
         select: SelectBuilder[Any, Any, Any, Any, Any],
         columns: Sequence[str] | None = ...,
     ) -> InsertBuilder[Set]: ...
+    def returning(self, *columns: ColumnUnit[Any]) -> InsertBuilder[F]: ...
     def to_sqls(
         self,
         *,

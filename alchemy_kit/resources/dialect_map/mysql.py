@@ -7,6 +7,7 @@ from sqlalchemy.types import NullType
 from ._base import ColumnLike, DialectMap, SaTypeFactory
 from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import MysqlTypeParameters
+from ...types.returning_support import ReturningSupport
 from ...types.statement_limits import StatementLimits
 
 
@@ -154,6 +155,7 @@ class MysqlMap(DialectMap[MysqlTypeParameters]):
     _quote_open = "`"
     _quote_close = "`"
     limits = StatementLimits(max_params=65535)
+    returning = ReturningSupport()
 
     @classmethod
     def render_type(cls, column: ColumnLike) -> str:

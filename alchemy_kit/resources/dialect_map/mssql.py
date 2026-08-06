@@ -6,6 +6,7 @@ from sqlalchemy.dialects import mssql as sa_mssql
 from ._base import ColumnLike, DialectMap, ReflectedTypeFacts, SaTypeFactory
 from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import MssqlTypeParameters
+from ...types.returning_support import ReturningSupport
 from ...types.statement_limits import StatementLimits
 
 
@@ -120,6 +121,7 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
     _quote_open = "["
     _quote_close = "]"
     limits = StatementLimits(max_params=2100, driver_reserved_params=2, max_values_rows=1000)
+    returning = ReturningSupport(insert=True, update=True, delete=True)
 
     @classmethod
     def reflected_type_facts(cls, sa_type: object) -> ReflectedTypeFacts:

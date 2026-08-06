@@ -7,6 +7,7 @@ from sqlalchemy.types import BIGINT, CLOB, DOUBLE, DOUBLE_PRECISION, NCHAR, NVAR
 from ._base import ColumnLike, DialectMap, ReflectedTypeFacts, SaTypeFactory
 from ...types.py_type_parameters import PyTypeParameters
 from ...types.sql_type_parameters import SqliteTypeParameters
+from ...types.returning_support import ReturningSupport
 from ...types.statement_limits import StatementLimits
 
 
@@ -105,6 +106,7 @@ class SqliteMap(DialectMap[SqliteTypeParameters]):
     _sa_dialect_factory = sa_sqlite.dialect
     dialect_paramaters = frozenset(get_args(SqliteTypeParameters))
     limits = StatementLimits(max_params=32766)
+    returning = ReturningSupport(insert=True, update=True, delete=True)
 
     @classmethod
     def reflected_type_facts(cls, sa_type: object) -> ReflectedTypeFacts:

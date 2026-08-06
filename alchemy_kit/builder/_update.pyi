@@ -3,7 +3,7 @@ from typing import Any
 import pandas as pd
 from sqlalchemy.sql.expression import Update
 
-from ..model.units import BooleanColumnUnit, ObjectUnit
+from ..model.units import BooleanColumnUnit, ColumnUnit, ObjectUnit
 from ..resources._sql import SQL
 from ..types.typestate import Set, Unset
 from ._base import SqlBuilder
@@ -24,6 +24,10 @@ class UpdateBuilder[S, W](SqlBuilder):
         self: UpdateBuilder[S, Unset],
         *conditions: BooleanColumnUnit[Any],
     ) -> UpdateBuilder[S, Set]: ...
+    def returning(
+        self: UpdateBuilder[S, W],
+        *columns: ColumnUnit[Any],
+    ) -> UpdateBuilder[S, W]: ...
     def to_sql(self: UpdateBuilder[Set, W], **parameters: Any) -> SQL: ...
     def render(self: UpdateBuilder[Set, W]) -> str: ...
     def run(

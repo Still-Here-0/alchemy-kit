@@ -9,7 +9,14 @@ from alchemy_kit.builder import (
 )
 from alchemy_kit.connect._engine_handler import EngineHandler
 
-from _helpers import MSSQL_HANDLER, SQLITE_HANDLER, items, mssql_items
+from _helpers import (
+    MSSQL_HANDLER,
+    ORACLE_HANDLER,
+    SQLITE_HANDLER,
+    items,
+    mssql_items,
+    oracle_items,
+)
 
 
 def test_delete_render_and_parameters():
@@ -109,3 +116,28 @@ def test_truncate_runs_and_clears_table(handler: EngineHandler):
 
     _, df = SelectBuilder(from_=t).run()
     assert df.empty
+
+
+def test_delete_returning_hands_back_the_removed_rows(handler: EngineHandler):
+    t = _staged_items(handler)
+
+    count, data = DeleteBuilder(t).where(t.price > 1).returning(t.id_1, t.name).run()
+
+    assert count == 1
+    assert data.to_dict(orient="records") == [{"id": 2, "name": "nut"}]
+
+    _, remaining = SelectBuilder(t.name, from_=t).run()
+    assert remaining["name"].tolist() == ["bolt"]
+
+
+def test_delete_returning_renders_mssql_output_deleted():
+    i = MSSQL_HANDLER.get_unit(mssql_items)
+
+    assert "OUTPUT deleted.id" in DeleteBuilder(i).returning().render()
+
+
+def test_delete_returning_raises_where_the_dialect_cannot():
+    i = ORACLE_HANDLER.get_unit(oracle_items)
+
+    with pytest.raises(ValueError, match="cannot return the rows DELETE affects"):
+        DeleteBuilder(i).returning()
