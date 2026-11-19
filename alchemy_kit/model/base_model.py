@@ -9,6 +9,7 @@ from pandera.pandas import DataFrameModel
 from pandera.typing import DataFrame
 
 from ..resources._sql import SQL
+from ..types.date_time_offset import DateTimeOffset
 from ..types.errors._model_validation_error import ModelValidationError
 from ..types.model_metadata import MetaData
 
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from ..types.model_metadata import ForeignKeyMeta
     from .units._object_unit import ObjectUnit
 
-__all__ = ["MetaData", "BaseModel"]
+__all__ = ["MetaData", "BaseModel", "DateTimeOffset"]
 
 
 class _BaseModelMeta(MetaModel):
@@ -63,8 +64,13 @@ class BaseModel(DataFrameModel, metaclass=_BaseModelMeta):
         inplace: bool = False,
         drop_invalid_rows: bool = False,
         handler: "EngineHandler[Any] | None" = None,
+        strip_timezone: bool = True,
     ) -> DataFrame[Self]:
-        """Validate a DataFrame against this model, stripping timezones first.
+        """Validate a DataFrame against this model.
+
+        With ``strip_timezone`` (the default), timezone-aware values in
+        timezone-naive datetime columns are converted to UTC and made naive
+        first. ``DateTimeOffset`` columns always keep their offsets.
 
         When ``handler`` is given, an online tier runs after the offline
         (shape + checks) validation: every foreign-key column recorded in the
@@ -72,7 +78,8 @@ class BaseModel(DataFrameModel, metaclass=_BaseModelMeta):
         referenced tables, through that connection.
         """
         try:
-            check_obj = cls._strip_timezone(check_obj)
+            if strip_timezone:
+                check_obj = cls._strip_timezone(check_obj)
 
             if drop_invalid_rows:
                 schema = copy.deepcopy(cls.to_schema())

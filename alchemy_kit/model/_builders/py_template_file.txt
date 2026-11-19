@@ -8,7 +8,7 @@
 #
 # --------------------------------------------------------------------------------
 
-from {base_model_module} import BaseModel, MetaData
+from {base_model_module} import BaseModel, MetaData, DateTimeOffset
 from datetime import datetime, date
 from pandera.typing import Series
 from typing import Optional, Any

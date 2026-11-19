@@ -38,7 +38,7 @@ class OracleMap(DialectMap[OracleTypeParameters]):
         # Date / time (Oracle DATE carries a time component)
         "date": "datetime",
         "timestamp": "datetime",
-        "timestamp with time zone": "datetime",
+        "timestamp with time zone": "DateTimeOffset",
         "timestamp with local time zone": "datetime",
         "interval year to month": "Any",
         "interval day to second": "Any",

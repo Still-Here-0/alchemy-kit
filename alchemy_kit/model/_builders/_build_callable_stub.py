@@ -44,4 +44,6 @@ class CallableStubFileBuilder:
 
     def _parameter_type(self, parameter: ParameterModel) -> str:
         py_type = self.db_dialect.get_py_type(parameter.type)
+        if py_type == "DateTimeOffset":
+            py_type = "datetime"
         return f"Optional[{py_type}]" if parameter.is_nullable else py_type

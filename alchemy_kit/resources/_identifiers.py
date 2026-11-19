@@ -25,7 +25,7 @@ class Identifiers:
 
             # imports
             "Optional", "Any", "Decimal", "pa",  "init", "date",
-            "Series", "datetime", "SQL", "DataFrame",
+            "Series", "datetime", "DateTimeOffset", "SQL", "DataFrame",
             "CallableModel", "CallableUnit", "EngineHandler",
 
             # object unit

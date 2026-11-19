@@ -177,6 +177,13 @@ DataFrame can be validated against the table's real shape:
 items.validate(df)
 ```
 
+Timezone-aware values in naive datetime columns are converted to UTC and made
+naive before validation; pass `strip_timezone=False` to skip that step.
+Offset-storing columns (SQL Server `datetimeoffset`, Oracle
+`timestamp with time zone`) are typed `DateTimeOffset`: an object column of
+timezone-aware timestamps that keeps each row's own offset, from validation
+through `insert_data`.
+
 ## Documentation
 
 In-depth developer documentation — covering the architecture and each component

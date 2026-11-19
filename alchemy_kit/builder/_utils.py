@@ -6,6 +6,7 @@ from pandas.api import types as pdt
 
 from ..model.base_model import BaseModel
 from ..model.units import ColumnUnit, ObjectUnit
+from ..types.date_time_offset import holds_offset_datetimes
 from ..types.sql_types import SqlScalarType
 
 type _Assignment = tuple[ColumnUnit[Any], ColumnUnit[Any] | SqlScalarType]
@@ -33,7 +34,9 @@ def sa_type_from_series(series: pd.Series) -> sa.types.TypeEngine[Any]:
     if pdt.is_float_dtype(series):
         return sa.Float()
     if pdt.is_datetime64_any_dtype(series):
-        return sa.DateTime()
+        return sa.DateTime(timezone=isinstance(series.dtype, pd.DatetimeTZDtype))
+    if holds_offset_datetimes(series):
+        return sa.DateTime(timezone=True)
     if pdt.is_timedelta64_dtype(series):
         return sa.Interval()
 

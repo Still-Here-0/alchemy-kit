@@ -33,7 +33,7 @@ class MssqlMap(DialectMap[MssqlTypeParameters]):
         "datetime": "datetime",
         "datetime2": "datetime",
         "smalldatetime": "datetime",
-        "datetimeoffset": "datetime",
+        "datetimeoffset": "DateTimeOffset",
         "time": "Any",
         # Character strings
         "char": "str",

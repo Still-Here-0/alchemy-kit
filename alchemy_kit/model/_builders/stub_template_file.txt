@@ -8,7 +8,7 @@
 #
 # --------------------------------------------------------------------------------
 
-from {base_model_module} import BaseModel
+from {base_model_module} import BaseModel, DateTimeOffset
 from {engine_handler_module} import EngineHandler
 from {object_unit_module} import ObjectUnit
 from {column_unit_module} import ColumnUnit

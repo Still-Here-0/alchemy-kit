@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Hashable, Mapping, Sequence
 from typing import Any, Literal, Protocol, cast
 
 import pandas as pd
@@ -6,6 +6,7 @@ import sqlalchemy
 
 from ..resources._sql import SQL
 from ..types._sql_parameters import SqlParamMap
+from ..types.date_time_offset import holds_offset_datetimes
 from ..types.sql_types import SQL_EXPAND_CLASSES, SqlParamType
 from ._info import ConnectionInfo
 
@@ -201,13 +202,27 @@ class EngineHandler[_TypeParameters: str]:
         ``to_sql`` (``if_exists`` passed through, index never inserted) and
         return the inserted row count.
 
+        ``DateTimeOffset`` columns are sent with their UTC offsets.
+
         ``truncate`` empties the table first, in the same transaction as the
         insert.
         """
         table_ref = f"{database_name}.{schema_name}.{table_name}"
+        offset_columns: dict[Hashable, Any] = {
+            name: sqlalchemy.DateTime(timezone=True)
+            for name, column in data.items()
+            if holds_offset_datetimes(column)
+        }
 
         with self._engine.begin() as conn:
             if truncate:
                 conn.execute(sqlalchemy.text(f"TRUNCATE TABLE {table_ref}"))
 
-            return data.to_sql(table_name, conn, schema=schema_name, if_exists=if_exists, index=False)
+            return data.to_sql(
+                table_name,
+                conn,
+                schema=schema_name,
+                if_exists=if_exists,
+                index=False,
+                dtype=offset_columns or None,
+            )
